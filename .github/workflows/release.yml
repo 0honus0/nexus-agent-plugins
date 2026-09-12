@@ -1,0 +1,52 @@
+name: Release plugins
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin id
+        required: true
+        default: nexus.developer
+      release_tag:
+        description: Existing GitHub release tag to upload into
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: node scripts/check.mjs
+      - name: Resolve release inputs
+        id: release
+        shell: bash
+        run: |
+          plugin="${{ github.event.inputs.plugin || 'nexus.developer' }}"
+          tag="${{ github.event.release.tag_name || github.event.inputs.release_tag }}"
+          echo "plugin=$plugin" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Write signing key
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.NEXUS_AGENT_PLUGIN_SIGNING_KEY_PEM }}
+        run: |
+          test -n "$SIGNING_KEY"
+          umask 077
+          printf '%s' "$SIGNING_KEY" > "$RUNNER_TEMP/plugin-signing-key.pem"
+      - name: Build signed package and catalog
+        shell: bash
+        run: >-
+          node scripts/build-release.mjs
+          "plugins/${{ steps.release.outputs.plugin }}"
+          "$RUNNER_TEMP/plugin-signing-key.pem"
+          .dist
+          "https://github.com/${{ github.repository }}/releases/download/${{ steps.release.outputs.tag }}"
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ steps.release.outputs.tag }}" .dist/* --clobber
