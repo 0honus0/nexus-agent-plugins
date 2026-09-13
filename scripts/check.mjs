@@ -10,6 +10,9 @@ const failures = [];
 const semver = /^\d+\.\d+\.\d+$/;
 const appId = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/;
 const intentId = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
+const supportedSdkMajor = 1;
+const supportedNexusMajor = 1;
+const semverMajor = (value) => Number(value.split('.')[0]);
 const allowedCapabilities = new Set([
   'ai.model.use',
   'runs.execute',
@@ -77,6 +80,7 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
   if (typeof manifest.version !== 'string' || !semver.test(manifest.version)) failures.push(`${entry.name}: version must be semver x.y.z`);
   if (typeof manifest.displayName !== 'string' || !manifest.displayName.trim()) failures.push(`${entry.name}: displayName is required`);
   if (typeof manifest.sdkVersion !== 'string' || !semver.test(manifest.sdkVersion)) failures.push(`${entry.name}: sdkVersion must be semver x.y.z`);
+  else if (semverMajor(manifest.sdkVersion) !== supportedSdkMajor) failures.push(`${entry.name}: sdkVersion must remain on supported major ${supportedSdkMajor}`);
   if (!manifest.nexus || typeof manifest.nexus !== 'object' || Array.isArray(manifest.nexus)) {
     failures.push(`${entry.name}: nexus compatibility range is required`);
   } else {
@@ -84,6 +88,8 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
     const maxVersion = manifest.nexus.maxVersion;
     if (typeof minVersion !== 'string' || !semver.test(minVersion)) failures.push(`${entry.name}: nexus.minVersion must be semver x.y.z`);
     if (typeof maxVersion !== 'string' || !semver.test(maxVersion)) failures.push(`${entry.name}: nexus.maxVersion must be semver x.y.z`);
+    if (semver.test(minVersion ?? '') && semverMajor(minVersion) !== supportedNexusMajor) failures.push(`${entry.name}: nexus.minVersion must remain on supported major ${supportedNexusMajor}`);
+    if (semver.test(maxVersion ?? '') && semverMajor(maxVersion) !== supportedNexusMajor) failures.push(`${entry.name}: nexus.maxVersion must remain on supported major ${supportedNexusMajor}`);
     if (semver.test(minVersion ?? '') && semver.test(maxVersion ?? '')) {
       const parts = (value) => value.split('.').map(Number);
       const compare = (left, right) => {
