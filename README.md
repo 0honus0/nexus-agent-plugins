@@ -36,8 +36,9 @@ The SDK proxies only explicit App-scoped operations. Plugin frontend code never 
 
 - `plugins/` — first-party App source; each App contains its versioned `manifest.json` and only the optional targets/Skills it uses.
 - `scripts/build-package.mjs` — reproducibly builds and Ed25519-signs one App package.
-- `scripts/build-release.mjs` — builds a signed package plus release `catalog.json`.
-- `catalog/` — release/catalog documentation; generated release output is written to `.dist/`.
+- `scripts/build-release.mjs` — convenience builder for one signed App package plus a single-package catalog.
+- `scripts/build-catalog-release.mjs` — official release builder; signs every first-party App under `plugins/` with the same publisher identity and emits one multi-package `catalog.json`.
+- `catalog/` — official publisher metadata and release/catalog documentation; generated release output is written to `.dist/`.
 
 Private signing keys are never committed. Release automation expects `NEXUS_AGENT_PLUGIN_SIGNING_KEY_PEM` as a GitHub Actions secret.
 
@@ -48,9 +49,11 @@ corepack enable
 pnpm run check
 ```
 
-To build a release locally:
+To build the same multi-plugin catalog used by the official release workflow:
 
 ```bash
 printf "%s" "$NEXUS_AGENT_PLUGIN_SIGNING_KEY_PEM" > /tmp/nexus-plugin-key.pem
-pnpm build:release plugins/nexus.agent /tmp/nexus-plugin-key.pem .dist https://example.invalid/releases/v1.0.0
+pnpm build:catalog-release /tmp/nexus-plugin-key.pem .dist https://example.invalid/releases/v1.0.0
 ```
+
+The command fails unless the private key derives the exact publisher identity committed in `catalog/official-publisher.json`.
