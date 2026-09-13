@@ -59,3 +59,5 @@ pnpm build:catalog-release /tmp/nexus-plugin-key.pem .dist https://example.inval
 The command fails unless the private key derives the exact publisher identity committed in `catalog/official-publisher.json`.
 
 Generated catalog package entries include the package version plus `sdkVersion` and the supported Nexus version range. Nexus uses that metadata only as a download-time compatibility preflight; the signed package manifest remains authoritative and is validated again before installation. The current first-party line remains Plugin SDK 1.x / Nexus 1.x.
+
+For the first production publication, create the target tag as a draft GitHub Release, run the `Release plugins` workflow for that tag, verify `catalog.json` and both signed plugin tar assets, and only then publish the Release. Publish the Nexus production image after this catalog is live because the default official source resolves `releases/latest/download/catalog.json`.
