@@ -10,6 +10,7 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "build:package": "node scripts/build-package.mjs",
-    "build:release": "node scripts/build-release.mjs"
+    "build:release": "node scripts/build-release.mjs",
+    "build:catalog-release": "node scripts/build-catalog-release.mjs"
   }
 }
