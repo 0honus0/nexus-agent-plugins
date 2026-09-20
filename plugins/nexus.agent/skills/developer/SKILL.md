@@ -3,7 +3,7 @@ id: nexus.developer
 name: Developer
 version: 1.0.0
 description: Developer code and software implementation, build, test, debugging, and verification while preserving execution-target, capability, approval, and evidence boundaries.
-requiredCapabilities: workspace.runtime.execute,workspace.runtime.manage,machine.files.read,machine.files.write,machine.shell.execute,browser.operate,artifacts.read,artifacts.write
+requiredCapabilities: workspace.read,workspace.write,workspace.execute,workspace.manage,machine.files.read,machine.files.write,machine.shell.execute,browser.read,browser.interact,artifacts.read
 ---
 
 # Developer

@@ -1,28 +1,30 @@
 {
   "schemaVersion": 1,
   "id": "nexus.agent",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "displayName": "Nexus Agent",
   "sdkVersion": "1.0.0",
   "nexus": {
-    "minVersion": "1.0.0",
+    "minVersion": "1.0.2",
     "maxVersion": "1.99.99"
   },
   "capabilities": [
-    "ai.model.use",
-    "runs.execute",
-    "machine.diagnostics.read",
+    "machine.inspect",
     "machine.files.read",
     "machine.files.write",
     "machine.shell.execute",
-    "machine.docker.mutate",
-    "workspace.runtime.execute",
-    "workspace.runtime.manage",
+    "machine.docker.manage",
+    "workspace.read",
+    "workspace.write",
+    "workspace.execute",
+    "workspace.manage",
+    "browser.read",
+    "browser.interact",
+    "integration.mcp.read",
     "integration.mcp.invoke",
-    "integration.acp.execute",
-    "browser.operate",
+    "integration.acp.invoke",
     "artifacts.read",
-    "artifacts.write"
+    "app.intents.exchange"
   ],
   "intents": [
     {
@@ -36,7 +38,9 @@
       "version": "1.0.0",
       "displayName": "Nexus Agent",
       "description": "General-purpose Nexus Agent that selects signed first-party Skills while all execution remains governed by Host capabilities, policy, approvals, leases, Workspace Runtime, and Browser boundaries.",
-      "requiredModelCapabilities": ["streaming"]
+      "requiredModelCapabilities": [
+        "streaming"
+      ]
     }
   ],
   "agentSurface": {
