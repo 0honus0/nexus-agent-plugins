@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing GitHub release tag to upload into
+        description: Existing draft or published GitHub release tag to upload into
         required: true
 jobs:
   build:
@@ -21,9 +21,14 @@ jobs:
           tag="${{ github.event.release.tag_name || github.event.inputs.release_tag }}"
           test -n "$tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "checkout_ref=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "checkout_ref=$tag" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ steps.release.outputs.checkout_ref }}
       - name: Require validated current main commit
         shell: bash
         env:

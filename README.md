@@ -4,6 +4,8 @@ First-party installable Agent Apps for [Nexus Terminal](https://github.com/0honu
 
 This repository owns distributable plugin source and release metadata. Nexus Terminal owns the Plugin SDK/protocol, package verification, App capability policy, Agent Runtime, Host UI, and target runtime implementation.
 
+Capability declarations represent only cross-resource security boundaries. Core Agent lifecycle operations (model use, Run execution, Skills, Plans, and internal collaboration), App-owned isolated storage, and Host-generated Artifact output are intrinsic to an enabled App and do not require separate grants. Current resource grants are split by Host machine, Workspace, Browser, external integrations, Artifact reads, and explicit cross-App data exchange.
+
 ## App composition
 
 An Agent App is composed only from the parts it actually needs:
@@ -60,4 +62,4 @@ The command fails unless the private key derives the exact publisher identity co
 
 Generated catalog package entries include the package version plus `sdkVersion` and the supported Nexus version range. Nexus uses that metadata only as a download-time compatibility preflight; the signed package manifest remains authoritative and is validated again before installation. The current first-party line remains Plugin SDK 1.x / Nexus 1.x.
 
-For the first production publication, create the target tag as a draft GitHub Release, run the `Release plugins` workflow for that tag, verify `catalog.json` and both signed plugin tar assets, and only then publish the Release. Publish the Nexus production image after this catalog is live because the default official source resolves `releases/latest/download/catalog.json`.
+For a production publication, create a **draft GitHub Release** whose target is the current validated `main` commit, then run the `Release plugins` workflow with that draft release tag. A draft release does not create the Git tag yet, so manual `workflow_dispatch` releases intentionally check out `main`; the workflow then verifies that the checked-out SHA is still the current `main` commit and already has a successful `Plugin validation gate`. Verify `catalog.json` and both signed plugin tar assets on the draft, and only then publish the Release (which creates the tag when it does not already exist). Publish the Nexus production image after this catalog is live because the default official source resolves `releases/latest/download/catalog.json`.
