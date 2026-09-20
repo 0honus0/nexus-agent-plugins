@@ -13,6 +13,7 @@ const intentId = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
 const supportedSdkMajor = 1;
 const supportedNexusMajor = 1;
 const semverMajor = (value) => Number(value.split('.')[0]);
+const allowedModelCapabilities = new Set(['tools', 'image_input', 'file_input', 'reasoning']);
 const allowedCapabilities = new Set([
   'machine.inspect',
   'machine.files.read',
@@ -133,6 +134,11 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
         if (!agent || typeof agent !== 'object' || Array.isArray(agent) || typeof agent.id !== 'string' || !intentId.test(agent.id) || typeof agent.version !== 'string' || !semver.test(agent.version) || typeof agent.displayName !== 'string' || !agent.displayName.trim() || typeof agent.description !== 'string' || !agent.description.trim() || !Array.isArray(agent.requiredModelCapabilities) || agent.requiredModelCapabilities.length > 32 || agent.requiredModelCapabilities.some((value) => typeof value !== 'string' || !value.trim()) || new Set(agent.requiredModelCapabilities).size !== agent.requiredModelCapabilities.length) {
           failures.push(`${entry.name}: invalid AgentDefinition`);
           continue;
+        }
+        for (const capability of agent.requiredModelCapabilities) {
+          if (!allowedModelCapabilities.has(capability)) {
+            failures.push(`${entry.name}: unknown Agent model capability ${capability} in ${agent.id}`);
+          }
         }
         if (seen.has(agent.id)) failures.push(`${entry.name}: duplicate AgentDefinition ${agent.id}`);
         seen.add(agent.id);
