@@ -15,14 +15,12 @@ const supportedNexusMajor = 1;
 const semverMajor = (value) => Number(value.split('.')[0]);
 const allowedModelCapabilities = new Set(['tools', 'image_input', 'file_input', 'reasoning']);
 const allowedCapabilities = new Set([
+  'file.read',
+  'file.write',
+  'file.delete',
   'machine.inspect',
-  'machine.files.read',
-  'machine.files.write',
-  'machine.shell.execute',
+  'shell.execute',
   'machine.docker.manage',
-  'workspace.read',
-  'workspace.write',
-  'workspace.execute',
   'workspace.manage',
   'browser.read',
   'browser.interact',
@@ -32,6 +30,8 @@ const allowedCapabilities = new Set([
   'artifacts.read',
   'app.intents.exchange',
 ]);
+const allowedSkillFields = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);
+const standardSkillName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const officialPublisherPath = path.join(root, 'catalog', 'official-publisher.json');
 try {
@@ -190,25 +190,37 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
       const end = content.startsWith('---\n') ? content.indexOf('\n---\n', 4) : -1;
       if (end < 0) { failures.push(`${entry.name}: invalid Skill frontmatter in ${skillDir.name}`); continue; }
       const fields = new Map();
+      let frontmatterInvalid = false;
       for (const line of content.slice(4, end).split('\n')) {
-        const separator = line.indexOf(':');
-        if (separator > 0) fields.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+        if (!line.trim() || line.trimStart().startsWith('#') || /^\s/.test(line)) continue;
+        const match = /^([A-Za-z0-9_-]+):(?:\s*(.*))?$/.exec(line);
+        if (!match || fields.has(match[1])) {
+          frontmatterInvalid = true;
+          continue;
+        }
+        fields.set(match[1], (match[2] ?? '').trim());
       }
-      const id = fields.get('id') ?? '';
+      if (frontmatterInvalid || [...fields.keys()].some((field) => !allowedSkillFields.has(field))) {
+        failures.push(`${entry.name}: invalid Skill frontmatter fields in ${skillDir.name}`);
+      }
       const name = fields.get('name') ?? '';
-      const version = fields.get('version') ?? '';
       const description = fields.get('description') ?? '';
-      const requiredCapabilities = (fields.get('requiredCapabilities') ?? '').split(',').map((value) => value.trim()).filter(Boolean);
-      if (!/^[a-z0-9][a-z0-9._-]{2,127}$/.test(id)) failures.push(`${entry.name}: invalid Skill id in ${skillDir.name}`);
+      const id = `${manifest.id}.${name}`;
+      if (
+        !name ||
+        name.length > 64 ||
+        !standardSkillName.test(name) ||
+        name !== skillDir.name ||
+        Buffer.byteLength(name, 'utf8') > 128
+      ) {
+        failures.push(`${entry.name}: invalid Skill name in ${skillDir.name}`);
+      }
+      if (!description || Buffer.byteLength(description, 'utf8') > 1024) {
+        failures.push(`${entry.name}: invalid Skill description in ${skillDir.name}`);
+      }
+      if (!/^[a-z0-9][a-z0-9._-]{2,127}$/.test(id)) failures.push(`${entry.name}: invalid derived Skill id ${id}`);
       if (skillIds.has(id)) failures.push(`${entry.name}: duplicate Skill id ${id}`);
       skillIds.add(id);
-      if (!name || Buffer.byteLength(name, 'utf8') > 128) failures.push(`${entry.name}: invalid Skill name in ${skillDir.name}`);
-      if (!semver.test(version)) failures.push(`${entry.name}: invalid Skill version in ${skillDir.name}`);
-      if (!description || Buffer.byteLength(description, 'utf8') > 1024) failures.push(`${entry.name}: invalid Skill description in ${skillDir.name}`);
-      for (const capability of requiredCapabilities) {
-        if (!allowedCapabilities.has(capability)) failures.push(`${entry.name}: unknown Skill capability ${capability} in ${skillDir.name}`);
-        if (!manifest.capabilities?.includes(capability)) failures.push(`${entry.name}: Skill ${id || skillDir.name} requires undeclared capability ${capability}`);
-      }
       if (Buffer.byteLength(content.slice(end + 5), 'utf8') > 12 * 1024) failures.push(`${entry.name}: Skill body too large in ${skillDir.name}`);
     }
   }
