@@ -4,6 +4,8 @@ First-party installable Agent Apps for [Nexus Terminal](https://github.com/0honu
 
 This repository owns distributable plugin source and release metadata. Nexus Terminal owns the Plugin SDK/protocol, package verification, App capability policy, Agent Runtime, Host UI, and target runtime implementation.
 
+Permissions use the current Host capability contract only: `file.read/write/delete` and `shell.execute` are scoped to Workspace/SSH targets. Host grants use schema v2 (`global` or typed `targets` with `all`/`ids` selections); Plugin manifests continue to use manifest schema v1 and declare capability names, not persisted grants. No legacy permission aliases or grant conversion belongs in Plugin code. Approval mode does not override grants, target restrictions, hard-deny policy, or plan-mode read-only execution.
+
 Capability declarations represent only cross-resource security boundaries. Core Agent lifecycle operations (model use, Run execution, Skills, Plans, and internal collaboration), App-owned isolated storage, and Host-generated Artifact output are intrinsic to an enabled App and do not require separate grants. Current resource grants are split by Host machine, Workspace, Browser, external integrations, Artifact reads, and explicit cross-App data exchange.
 
 ## App composition
