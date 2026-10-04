@@ -54,7 +54,7 @@ jobs:
           fi
       - uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "current"
           package-manager-cache: false
       - run: node scripts/check.mjs
       - name: Write signing key
