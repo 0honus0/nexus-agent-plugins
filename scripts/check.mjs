@@ -21,7 +21,6 @@ const allowedCapabilities = new Set([
   'machine.inspect',
   'shell.execute',
   'machine.docker.manage',
-  'workspace.manage',
   'browser.read',
   'browser.interact',
   'integration.mcp.read',
@@ -149,7 +148,10 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
     if (!manifest.targets || typeof manifest.targets !== 'object' || Array.isArray(manifest.targets)) {
       failures.push(`${entry.name}: targets must be an object`);
     } else {
-      for (const target of ['frontend', 'backend', 'runner']) {
+      if (Object.keys(manifest.targets).some((target) => !['frontend', 'backend'].includes(target))) {
+        failures.push(`${entry.name}: only frontend/backend plugin targets are supported`);
+      }
+      for (const target of ['frontend', 'backend']) {
         const spec = manifest.targets[target];
         if (spec === undefined) continue;
         const expectedPrefix = `${target}/`;

@@ -4,9 +4,9 @@ First-party installable Agent Apps for [Nexus Terminal](https://github.com/0honu
 
 This repository owns distributable plugin source and release metadata. Nexus Terminal owns the Plugin SDK/protocol, package verification, App capability policy, Agent Runtime, Host UI, and target runtime implementation.
 
-Permissions use the current Host capability contract only: `file.read/write/delete` and `shell.execute` are scoped to Workspace/SSH targets. Host grants use schema v2 (`global` or typed `targets` with `all`/`ids` selections); Plugin manifests continue to use manifest schema v1 and declare capability names, not persisted grants. No legacy permission aliases or grant conversion belongs in Plugin code. Approval mode does not override grants, target restrictions, hard-deny policy, or plan-mode read-only execution.
+Permissions use the current Host capability contract only: `file.read/write/delete` and `shell.execute` are scoped to explicitly authorized SSH targets. Host grants use typed target selections; Plugin manifests continue to use manifest schema v1 and declare capability names, not persisted grants. No legacy permission aliases or grant conversion belongs in Plugin code. Approval mode does not override grants, target restrictions, hard-deny policy, or plan-mode read-only execution.
 
-Capability declarations represent only cross-resource security boundaries. Core Agent lifecycle operations (model use, Run execution, Skills, Plans, and internal collaboration), App-owned isolated storage, and Host-generated Artifact output are intrinsic to an enabled App and do not require separate grants. Current resource grants are split by Host machine, Workspace, Browser, external integrations, Artifact reads, and explicit cross-App data exchange.
+Capability declarations represent only cross-resource security boundaries. Core Agent lifecycle operations (model use, Run execution, Skills, Plans, and internal collaboration), App-owned isolated storage, and Host-generated Artifact output are intrinsic to an enabled App and do not require separate grants. Current resource grants are split by Host machine, explicit SSH targets, Browser, external integrations, Artifact reads, and explicit cross-App data exchange.
 
 ## App composition
 
@@ -16,13 +16,12 @@ An Agent App is composed only from the parts it actually needs:
 - `skills/` — optional model-facing Skills.
 - `frontend/` — optional **full custom App surface**. When absent and the manifest declares AgentDefinitions, Nexus uses its built-in Agent conversation surface.
 - `backend/` — optional native Backend child target for App-owned background/state logic; it runs outside the Nexus Backend process through the bounded Backend Plugin protocol.
-- `runner/` — optional trusted native Runner target for Workspace-local logic.
 
-Targets are not a checklist. `nexus.agent` intentionally contains one generic `agent.default` AgentDefinition plus exactly two signed Skills: `nexus.operations` and `nexus.developer`. Nexus already owns the conversation, Run, approval, Artifact, Browser, and Workspace UI/runtime, so Operations and Developer do not need duplicate App shells or empty target directories.
+Targets are not a checklist. `nexus.agent` intentionally contains one generic `agent.default` AgentDefinition plus exactly two signed Skills: `nexus.operations` and `nexus.developer`. Nexus already owns the conversation, Run, approval, Artifact, Browser, and SSH execution UI/runtime, so Operations and Developer do not need duplicate App shells or empty target directories.
 
 Skill layout is intentionally single-source: every Skill is exactly `skills/<slug>/SKILL.md`. The Markdown frontmatter follows the current Host Skill contract: `name` and `description` are required, while `license`, `compatibility`, `metadata`, and `allowed-tools` are optional. The Skill id is derived by Nexus as `<appId>.<name>`, and the Skill version is inherited from the installed Plugin version; neither is duplicated in Skill frontmatter, and capability grants remain owned by the Plugin manifest/Host rather than a `requiredCapabilities` field. Full `SKILL.md` instructions are not injected automatically; the model explicitly calls the Host-owned read-only `skill_read(id)` tool when it needs one Skill, and Nexus rechecks the installed package file hash before returning that body. All Skills in a Plugin version remain covered by the single package-level Ed25519 signature plus the signed file hash list; Skills are not separately signed packages.
 
-`nexus.fullstack` is the first-party target-composition reference App. It deliberately declares all three optional target classes: an isolated custom frontend, a native Backend child lifecycle target using only the bounded Backend Plugin protocol/App Storage SDK, and a Workspace-local Runner target. It exists to keep the full target lifecycle continuously exercised without moving Host security primitives into plugin code.
+`nexus.fullstack` is the first-party target-composition reference App. It declares both supported target classes: an isolated custom frontend and a native Backend child lifecycle target using only the bounded Backend Plugin protocol/App Storage SDK. It exists to keep the full target lifecycle continuously exercised without moving Host security primitives into plugin code.
 
 An App that needs a completely different product experience can declare `targets.frontend`. Nexus then gives the whole App content area to that isolated iframe. Custom frontends import the Nexus-hosted SDK from the isolated Plugin origin:
 
