@@ -1,18 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "nexus.agent",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Nexus Agent",
-  "sdkVersion": "1.0.0",
-  "nexus": {
-    "minVersion": "1.0.0",
-    "maxVersion": "1.99.99"
-  },
+  "sdkVersion": "1",
   "capabilities": [
     "file.read",
     "file.write",
     "file.delete",
     "machine.inspect",
+    "host.inspect",
     "shell.execute",
     "machine.docker.manage",
     "browser.read",
@@ -21,24 +18,14 @@
     "integration.mcp.invoke",
     "integration.acp.invoke",
     "artifacts.read",
+    "artifacts.write",
+    "context.read",
+    "context.compact",
+    "memory.read",
+    "memory.propose",
     "app.intents.exchange"
   ],
-  "intents": [
-    {
-      "id": "memory.import",
-      "schemaVersion": 1
-    }
-  ],
-  "agents": [
-    {
-      "id": "agent.default",
-      "version": "1.0.0",
-      "displayName": "Nexus Agent",
-      "description": "General-purpose Nexus Agent using explicitly authorized SSH execution and independent Browser, integration, Artifact, and Plugin capabilities.",
-      "requiredModelCapabilities": ["tools"]
-    }
-  ],
-  "agentSurface": {
-    "defaultApprovalMode": "full_access"
-  }
+  "intents": [],
+  "frontendEntry": null,
+  "backendEntry": null
 }

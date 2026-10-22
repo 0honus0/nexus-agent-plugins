@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import nexusCompatibility from '../catalog/nexus-compatibility.json' with { type: 'json' };
 
 const [sourceArg, outputArg, keyArg] = process.argv.slice(2);
 if (!sourceArg || !outputArg || !keyArg) {
@@ -87,7 +88,7 @@ try {
         appId: manifest.id,
         version: manifest.version,
         sdkVersion: manifest.sdkVersion,
-        nexus: manifest.nexus,
+        nexus: { minVersion: nexusCompatibility.minVersion, maxVersion: nexusCompatibility.maxVersion },
         displayName: manifest.displayName,
         publisherKeyId,
         publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),

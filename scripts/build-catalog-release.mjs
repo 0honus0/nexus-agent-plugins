@@ -51,8 +51,7 @@ for (const entry of fs
     sdkVersion: metadata.sdkVersion,
     nexus: metadata.nexus,
     displayName: metadata.displayName,
-    description:
-      manifest.agents?.[0]?.description ?? `First-party Nexus plugin: ${metadata.displayName}.`,
+    description: `First-party Nexus plugin: ${metadata.displayName}.`,
     packageUrl: `${baseUrl}/${packageName}`,
     sha256: metadata.sha256,
     sizeBytes: metadata.sizeBytes,
@@ -63,7 +62,11 @@ for (const entry of fs
 if (!packages.length || !observedPublicKeyPem) throw new Error('OFFICIAL_PLUGIN_CATALOG_EMPTY');
 const catalog = {
   schemaVersion: 1,
-  publishers: [officialPublisher],
+  publishers: [{
+    keyId: officialPublisher.keyId,
+    label: officialPublisher.label,
+    publicKeyPem: officialPublisher.publicKeyPem,
+  }],
   packages,
 };
 const catalogPath = path.join(output, 'catalog.json');

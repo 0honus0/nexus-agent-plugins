@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 
 let active = false;
 let activation = null;
@@ -15,31 +16,41 @@ const assertDenied = (probe, expectedPermission) => {
 };
 
 const module = {
-  async activate(context) {
-    activation = context;
-    active = true;
+  async activate(input) {
+    const { context, request } = input;
+    if (context.protocol !== 1 || context.sdkVersion !== '1') throw new Error('PLUGIN_CONTEXT_MISMATCH');
+    const requestHost = async (value) => {
+      const response = await request(value);
+      if (!response.ok) throw new Error(response.error.code);
+      if (response.result.method !== value.method) throw new Error('PLUGIN_RESPONSE_MISMATCH');
+      return response.result.value;
+    };
     const fileReadDenied = assertDenied(() => fs.readFileSync('/etc/passwd', 'utf8'), 'FileSystemRead');
     const childProcessDenied = assertDenied(() => spawnSync(process.execPath, ['--version']), 'ChildProcess');
-    const current = await context.sdk.storage.get('backend.status');
-    await context.sdk.storage.put(
-      'backend.status',
-      {
-        state: 'active',
-        source: 'backend',
-        appId: context.scope.appId,
-        version: context.plugin.version,
-        protocolVersion: context.protocolVersion,
-        fileReadDenied,
-        childProcessDenied,
+    const current = await requestHost({ method: 'storage.get', params: { key: 'backend.status' } });
+    await requestHost({
+      method: 'storage.put',
+      params: {
+        key: 'backend.status',
+        expectedVersion: current?.version ?? 0,
+        operationId: randomUUID(),
+        valueJson: JSON.stringify({
+          state: 'active',
+          source: 'backend',
+          appId: context.appId,
+          version: context.version,
+          protocolVersion: context.protocol,
+          fileReadDenied,
+          childProcessDenied,
+        }),
       },
-      current?.version ?? null,
-    );
+    });
+    activation = context;
+    active = true;
   },
 
   health() {
-    return active && activation
-      ? { available: true, reason: null }
-      : { available: false, reason: 'FULLSTACK_BACKEND_NOT_ACTIVE' };
+    return active && activation !== null;
   },
 
   quiesce() {
@@ -49,10 +60,6 @@ const module = {
   dispose() {
     active = false;
     activation = null;
-  },
-
-  migrate({ storage }) {
-    return storage;
   },
 };
 

@@ -27,8 +27,7 @@ const catalog = {
     sdkVersion: metadata.sdkVersion,
     nexus: metadata.nexus,
     displayName: metadata.displayName,
-    description:
-      manifest.agents?.[0]?.description ?? `First-party Nexus plugin: ${metadata.displayName}.`,
+    description: `First-party Nexus plugin: ${metadata.displayName}.`,
     packageUrl: `${baseUrl}/${packageName}`,
     sha256: metadata.sha256,
     sizeBytes: metadata.sizeBytes,

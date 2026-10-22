@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, createPublicKey } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import nexusCompatibility from '../catalog/nexus-compatibility.json' with { type: 'json' };
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pluginsRoot = path.join(root, 'plugins');
@@ -10,15 +11,14 @@ const failures = [];
 const semver = /^\d+\.\d+\.\d+$/;
 const appId = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/;
 const intentId = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
-const supportedSdkMajor = 1;
 const supportedNexusMajor = 1;
 const semverMajor = (value) => Number(value.split('.')[0]);
-const allowedModelCapabilities = new Set(['tools', 'image_input', 'file_input', 'reasoning']);
 const allowedCapabilities = new Set([
   'file.read',
   'file.write',
   'file.delete',
   'machine.inspect',
+  'host.inspect',
   'shell.execute',
   'machine.docker.manage',
   'browser.read',
@@ -27,6 +27,11 @@ const allowedCapabilities = new Set([
   'integration.mcp.invoke',
   'integration.acp.invoke',
   'artifacts.read',
+  'artifacts.write',
+  'context.read',
+  'context.compact',
+  'memory.read',
+  'memory.propose',
   'app.intents.exchange',
 ]);
 const allowedSkillFields = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);
@@ -73,6 +78,8 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
   let manifest;
   try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); }
   catch { failures.push(`${entry.name}: manifest.json must be valid JSON`); continue; }
+  const manifestFields = ['schemaVersion', 'id', 'version', 'displayName', 'sdkVersion', 'capabilities', 'intents', 'frontendEntry', 'backendEntry'];
+  if (Object.keys(manifest).length !== manifestFields.length || Object.keys(manifest).some((key) => !manifestFields.includes(key))) failures.push(`${entry.name}: manifest must use the current exact field set`);
   if (manifest.schemaVersion !== 1) failures.push(`${entry.name}: schemaVersion must be 1`);
   if (typeof manifest.id !== 'string' || !appId.test(manifest.id)) failures.push(`${entry.name}: invalid id`);
   if (ids.has(manifest.id)) failures.push(`${entry.name}: duplicate id ${manifest.id}`);
@@ -80,13 +87,12 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
   if (entry.name !== manifest.id) failures.push(`${entry.name}: directory must match manifest id ${manifest.id}`);
   if (typeof manifest.version !== 'string' || !semver.test(manifest.version)) failures.push(`${entry.name}: version must be semver x.y.z`);
   if (typeof manifest.displayName !== 'string' || !manifest.displayName.trim()) failures.push(`${entry.name}: displayName is required`);
-  if (typeof manifest.sdkVersion !== 'string' || !semver.test(manifest.sdkVersion)) failures.push(`${entry.name}: sdkVersion must be semver x.y.z`);
-  else if (semverMajor(manifest.sdkVersion) !== supportedSdkMajor) failures.push(`${entry.name}: sdkVersion must remain on supported major ${supportedSdkMajor}`);
-  if (!manifest.nexus || typeof manifest.nexus !== 'object' || Array.isArray(manifest.nexus)) {
+  if (manifest.sdkVersion !== '1') failures.push(`${entry.name}: sdkVersion must be the exact string 1`);
+  if (!nexusCompatibility || typeof nexusCompatibility !== 'object' || Array.isArray(nexusCompatibility)) {
     failures.push(`${entry.name}: nexus compatibility range is required`);
   } else {
-    const minVersion = manifest.nexus.minVersion;
-    const maxVersion = manifest.nexus.maxVersion;
+    const minVersion = nexusCompatibility.minVersion;
+    const maxVersion = nexusCompatibility.maxVersion;
     if (typeof minVersion !== 'string' || !semver.test(minVersion)) failures.push(`${entry.name}: nexus.minVersion must be semver x.y.z`);
     if (typeof maxVersion !== 'string' || !semver.test(maxVersion)) failures.push(`${entry.name}: nexus.maxVersion must be semver x.y.z`);
     if (semver.test(minVersion ?? '') && semverMajor(minVersion) !== supportedNexusMajor) failures.push(`${entry.name}: nexus.minVersion must remain on supported major ${supportedNexusMajor}`);
@@ -124,43 +130,14 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
       seen.add(intent.id);
     }
   }
-  if (manifest.agents !== undefined) {
-    if (!Array.isArray(manifest.agents) || manifest.agents.length > 32) {
-      failures.push(`${entry.name}: agents must contain at most 32 definitions`);
-    } else {
-      const seen = new Set();
-      for (const agent of manifest.agents) {
-        if (!agent || typeof agent !== 'object' || Array.isArray(agent) || typeof agent.id !== 'string' || !intentId.test(agent.id) || typeof agent.version !== 'string' || !semver.test(agent.version) || typeof agent.displayName !== 'string' || !agent.displayName.trim() || typeof agent.description !== 'string' || !agent.description.trim() || !Array.isArray(agent.requiredModelCapabilities) || agent.requiredModelCapabilities.length > 32 || agent.requiredModelCapabilities.some((value) => typeof value !== 'string' || !value.trim()) || new Set(agent.requiredModelCapabilities).size !== agent.requiredModelCapabilities.length) {
-          failures.push(`${entry.name}: invalid AgentDefinition`);
-          continue;
-        }
-        for (const capability of agent.requiredModelCapabilities) {
-          if (!allowedModelCapabilities.has(capability)) {
-            failures.push(`${entry.name}: unknown Agent model capability ${capability} in ${agent.id}`);
-          }
-        }
-        if (seen.has(agent.id)) failures.push(`${entry.name}: duplicate AgentDefinition ${agent.id}`);
-        seen.add(agent.id);
-      }
-    }
-  }
-  if (manifest.targets !== undefined) {
-    if (!manifest.targets || typeof manifest.targets !== 'object' || Array.isArray(manifest.targets)) {
-      failures.push(`${entry.name}: targets must be an object`);
-    } else {
-      if (Object.keys(manifest.targets).some((target) => !['frontend', 'backend'].includes(target))) {
-        failures.push(`${entry.name}: only frontend/backend plugin targets are supported`);
-      }
-      for (const target of ['frontend', 'backend']) {
-        const spec = manifest.targets[target];
-        if (spec === undefined) continue;
-        const expectedPrefix = `${target}/`;
-        if (!spec || typeof spec !== 'object' || Array.isArray(spec) || typeof spec.entry !== 'string' || !spec.entry.startsWith(expectedPrefix) || spec.entry.includes('..')) {
-          failures.push(`${entry.name}: invalid ${target} target entry`);
-          continue;
-        }
-        if (!fs.existsSync(path.join(pluginRoot, spec.entry))) failures.push(`${entry.name}: missing target entry ${spec.entry}`);
-      }
+  for (const target of ['frontend', 'backend']) {
+    const value = manifest[`${target}Entry`];
+    if (value === null) continue;
+    if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 1024 ||
+        !value.startsWith(`${target}/`) || value.includes('\\') ||
+        value.split('/').some((part) => part.startsWith('.') || !/^[A-Za-z0-9_.-]{1,255}$/.test(part)) ||
+        !fs.existsSync(path.join(pluginRoot, value))) {
+      failures.push(`${entry.name}: invalid or missing ${target}Entry`);
     }
   }
   const walk = (dir) => {
@@ -223,7 +200,7 @@ for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a
       if (!/^[a-z0-9][a-z0-9._-]{2,127}$/.test(id)) failures.push(`${entry.name}: invalid derived Skill id ${id}`);
       if (skillIds.has(id)) failures.push(`${entry.name}: duplicate Skill id ${id}`);
       skillIds.add(id);
-      if (Buffer.byteLength(content.slice(end + 5), 'utf8') > 12 * 1024) failures.push(`${entry.name}: Skill body too large in ${skillDir.name}`);
+      if (Buffer.byteLength(content, 'utf8') > 12 * 1024) failures.push(`${entry.name}: Skill body too large in ${skillDir.name}`);
     }
   }
 }

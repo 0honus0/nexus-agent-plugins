@@ -7,22 +7,34 @@ const storageResult = document.querySelector('[data-testid="fullstack-storage-re
 
 try {
   const nexus = await connectNexusPlugin();
-  const app = await nexus.host.appInfo();
+  const request = async (input) => {
+    const response = await nexus.request(input);
+    if (response.method !== input.method) throw new Error('PLUGIN_RESPONSE_MISMATCH');
+    return response.value;
+  };
+  const app = await request({ method: 'host.appInfo', params: {} });
   frontendStatus.textContent = `frontend:ready:${app.appId}@${app.version}`;
 
-  const backend = await nexus.storage.get('backend.status');
-  backendStatus.textContent = backend?.value?.state === 'active' ? 'backend:active' : 'backend:missing';
+  const backend = await request({ method: 'storage.get', params: { key: 'backend.status' } });
+  const backendValue = backend?.valueJson === null || !backend ? null : JSON.parse(backend.valueJson);
+  backendStatus.textContent = backendValue?.state === 'active' ? 'backend:active' : 'backend:missing';
 
   writeButton.addEventListener('click', async () => {
     writeButton.disabled = true;
     try {
-      const current = await nexus.storage.get('frontend.demo');
-      const next = await nexus.storage.put(
-        'frontend.demo',
-        { source: 'frontend', counter: Number(current?.value?.counter ?? 0) + 1 },
-        current?.version ?? null,
-      );
-      storageResult.textContent = `storage:version:${next.version}:counter:${next.value.counter}`;
+      const current = await request({ method: 'storage.get', params: { key: 'frontend.demo' } });
+      const previous = current?.valueJson === null || !current ? null : JSON.parse(current.valueJson);
+      const counter = Number.isSafeInteger(previous?.counter) && previous.counter >= 0 ? previous.counter + 1 : 1;
+      const next = await request({
+        method: 'storage.put',
+        params: {
+          key: 'frontend.demo',
+          expectedVersion: current?.version ?? 0,
+          operationId: crypto.randomUUID(),
+          valueJson: JSON.stringify({ source: 'frontend', counter }),
+        },
+      });
+      storageResult.textContent = `storage:version:${next.version}:counter:${counter}`;
     } catch (error) {
       storageResult.textContent = `storage:error:${error instanceof Error ? error.message : String(error)}`;
     } finally {
