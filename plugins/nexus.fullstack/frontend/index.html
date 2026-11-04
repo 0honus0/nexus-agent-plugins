@@ -1,25 +1,31 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Full-stack Plugin</title>
-    <script type="module" src="./app.mjs"></script>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <main>
-      <h1>Full-stack Plugin</h1>
-      <p>This App deliberately ships isolated frontend and backend targets so the Nexus Plugin lifecycle can be exercised without moving Host security primitives into plugin code.</p>
-      <section class="card">
-        <div class="row">
-          <span class="badge" data-testid="fullstack-frontend-status">connecting</span>
-          <span class="badge" data-testid="fullstack-backend-status">backend:unknown</span>
-        </div>
-        <p>Frontend state is stored through the bounded Plugin SDK. Backend state is written by the native backend child target. Neither target has direct Host filesystem or shell authority.</p>
-        <button type="button" data-testid="fullstack-write-storage">Write frontend storage</button>
-        <p data-testid="fullstack-storage-result"><code>storage:not-written</code></p>
-      </section>
-    </main>
-  </body>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Full-stack Plugin</title>
+		<script type="module" src="./app.mjs"></script>
+		<link rel="stylesheet" href="./style.css" />
+	</head>
+	<body>
+		<main>
+			<h1>Full-stack Plugin</h1>
+			<p>
+				This App deliberately ships isolated frontend and backend targets so the Nexus Plugin lifecycle can be
+				exercised without moving Host security primitives into plugin code.
+			</p>
+			<section class="card">
+				<div class="row">
+					<span class="badge" data-testid="fullstack-frontend-status">connecting</span>
+					<span class="badge" data-testid="fullstack-backend-status">backend:unknown</span>
+				</div>
+				<p>
+					Frontend state is stored through the bounded Plugin SDK. Backend state is written by the native
+					backend child target. Neither target has direct Host filesystem or shell authority.
+				</p>
+				<button type="button" data-testid="fullstack-write-storage">Write frontend storage</button>
+				<p data-testid="fullstack-storage-result"><code>storage:not-written</code></p>
+			</section>
+		</main>
+	</body>
 </html>

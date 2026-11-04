@@ -13,15 +13,16 @@ Capability declarations use the current Host's explicit grants for SSH files/com
 An Agent App is composed only from the parts it actually needs:
 
 - `manifest.json` — exact current fields: `schemaVersion`, `id`, `version`, `displayName`, `sdkVersion`, `capabilities`, `intents`, `frontendEntry`, and `backendEntry`. SDK version is the literal string `"1"`; entry fields are explicit paths or `null`.
+- `agent.json` — optional signed Agent contribution: `{ schemaVersion: 1, role, toolNames, beforeStep, tools }`. `toolNames: null` retains the granted Host catalog; an array narrows it. It never grants capabilities.
 - `skills/` — optional model-facing Skills.
 - `frontend/` — optional **full custom App surface**. A `null` frontend entry uses the Host's native Agent conversation surface.
 - `backend/` — optional native Backend child target for App-owned background/state logic; it runs outside the Nexus Backend process through the bounded Backend Plugin protocol.
 
-Targets are not a checklist. `nexus.agent` contains exactly two signed Skills, `operations` and `developer`, and both entry fields are `null`. Nexus owns the conversation, Run, approval, Artifact, Browser, and SSH runtime. Obsolete `agents`, `agentSurface`, `targets`, and manifest-level `nexus` fields are not emitted or converted. Cross-App memory import is not advertised as a plugin intent.
+Targets are not a checklist. `nexus.agent` contains a concise signed role and exactly two signed Skills, `operations` and `developer`, and both entry fields are `null`. Nexus owns the conversation, Run, approval, Artifact, Browser, and SSH runtime. Obsolete `agents`, `agentSurface`, `targets`, and manifest-level `nexus` fields are not emitted or converted. Cross-App memory import is not advertised as a plugin intent.
 
-Skill layout is single-source: every Skill is `skills/<slug>/SKILL.md`, with required `name` and `description`, and optional `license`, `compatibility`, `metadata`, and `allowed-tools`. The Skill version comes from the installed Plugin. The two Nexus Agent Skills use a short workflow: confirm the target, inspect, change within authorization, verify, and report evidence. Runtime enforcement remains in the Host. Full instructions are not injected automatically: the model calls `skill_search`, then `skill_read` using the returned exact name/version/SHA-256. Nexus rechecks the installed package and authorization. All Skills share the package-level Ed25519 signature and signed file list; they are not separately signed packages or capability grants.
+Skill layout is single-source: every Skill is `skills/<slug>/SKILL.md`, with required `name` and `description`, and optional `license`, `compatibility`, `metadata`, and `allowed-tools`. The Skill version comes from the installed Plugin. The two Nexus Agent Skills use a short workflow: confirm the target, inspect, change within authorization, verify, and report evidence. Runtime enforcement remains in the Host. Full instructions are not injected automatically: the Host supplies current Skill metadata with every request; the model calls `skill_read` with its exact name/version/SHA-256 (`skill_search` remains available). Nexus rechecks the installed package and authorization. All Skills share the package-level Ed25519 signature and signed file list; they are not separately signed packages or capability grants.
 
-`nexus.fullstack` is the first-party target-composition reference App. It declares both supported target classes: an isolated custom frontend and a native Backend child lifecycle target using only the bounded Backend Plugin protocol/App Storage SDK. It exists to keep the full target lifecycle continuously exercised without moving Host security primitives into plugin code.
+`nexus.fullstack` is the first-party target-composition reference App. It declares both supported target classes: an isolated custom frontend and a native Backend child lifecycle target using only the bounded Backend Plugin protocol/App Storage SDK. Its signed contribution narrows model tools to `plugin_tool_call`, supplies a `beforeStep` context hook, and declares `backend_status`. The backend exports `agent(input, signal)` returning `{ text }`; context input has `kind/runId/stepIndex/prompt`, tool input has `kind/runId/stepIndex/operationId/name/argumentsJson`. `backend_status` accepts `{}` and reads only the App-owned status record. Hooks require `context.read`; tools require `plugin.invoke`, current grants, and per-call approval. Calls share the isolated instance lifecycle and are serialized; cancellation, timeout, upgrade, disable, or uninstall revoke the bound invocation. Unknown effects are fenced and never replayed.
 
 An App needing a custom product experience sets `frontendEntry` to a path under `frontend/`. Nexus gives the App content area to an isolated iframe. Custom frontends import the Nexus-hosted SDK:
 
@@ -50,18 +51,21 @@ Private signing keys are never committed. Release automation expects `NEXUS_AGEN
 
 ```bash
 corepack enable
+pnpm install --frozen-lockfile
 pnpm run check
 ```
+
+Code follows the Nexus Backend formatting standard: tabs, single quotes, semicolons, 120-column wrapping, braces for control flow, and blank lines around functions/methods. JSON and YAML use two spaces. Run `pnpm run format` to apply it; `pnpm run check` enforces formatting, lint, and package validation in CI and before release.
 
 To build the same multi-plugin catalog used by the official release workflow:
 
 ```bash
 printf "%s" "$NEXUS_AGENT_PLUGIN_SIGNING_KEY_PEM" > /tmp/nexus-plugin-key.pem
-pnpm build:catalog-release /tmp/nexus-plugin-key.pem .dist https://example.invalid/releases/v1.0.2
+pnpm build:catalog-release /tmp/nexus-plugin-key.pem .dist https://example.invalid/releases/v1.0.3
 ```
 
 The command fails unless the private key derives the exact publisher identity committed in `catalog/official-publisher.json`.
 
-Generated catalog entries include package version, exact SDK `"1"`, and the supported Nexus version range (currently 1.0.2–1.99.99). This range is a download-time preflight; the signed manifest identity, SDK, entries, capabilities, file hashes, and signature remain authoritative. The catalog's publisher objects contain only `keyId`, `label`, and `publicKeyPem`, not the local metadata's `schemaVersion`. The 1.0.1 packages target the rebuilt Host, not its old semver-SDK/manifest contract. Publish new immutable package versions instead of overwriting previously signed content. Nexus Agent 1.0.2 streamlines its two Skills into concise workflows while preserving target, authorization, verification, and evidence requirements. Existing installations receive these instructions through an explicit plugin upgrade. The unchanged Full-stack Plugin remains at 1.0.1.
+Generated catalog entries include package version, exact SDK `"1"`, and the supported Nexus version range (currently 1.0.3–1.99.99). This range is a download-time preflight; the signed manifest identity, SDK, entries, capabilities, file hashes, and signature remain authoritative. The catalog's publisher objects contain only `keyId`, `label`, and `publicKeyPem`, not the local metadata's `schemaVersion`. Version 1.0.3 requires the updated Nexus 1.0.3 Host. Both Apps publish new immutable packages; older hosts cannot install this catalog version. Existing installations require explicit plugin upgrade. No conversion of older SDK or manifest formats is provided.
 
 For a production publication, create a **draft GitHub Release** whose target is the current validated `main` commit, then run the `Release plugins` workflow with that draft release tag. A draft release does not create the Git tag yet, so manual `workflow_dispatch` releases intentionally check out `main`; the workflow then verifies that the checked-out SHA is still the current `main` commit and already has a successful `Plugin validation gate`. Verify `catalog.json` and both signed plugin tar assets on the draft, and only then publish the Release (which creates the tag when it does not already exist). Publish the Nexus production image after this catalog is live because the default official source resolves `releases/latest/download/catalog.json`.

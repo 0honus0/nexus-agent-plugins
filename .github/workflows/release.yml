@@ -52,11 +52,13 @@ jobs:
             echo "Current plugin main commit has no successful Plugin validation gate check: $source_sha" >&2
             exit 1
           fi
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
         with:
-          node-version: "current"
+          node-version: 'current'
           package-manager-cache: false
-      - run: node scripts/check.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
       - name: Write signing key
         shell: bash
         env:

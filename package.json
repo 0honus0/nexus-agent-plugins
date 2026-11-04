@@ -1,13 +1,20 @@
 {
   "name": "nexus-agent-plugins",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.26.0",
+  "packageManager": "pnpm@11.28.10",
   "scripts": {
-    "check": "node scripts/check.mjs",
+    "check": "pnpm run lint && pnpm run format:check && node scripts/check.mjs",
     "build:package": "node scripts/build-package.mjs",
     "build:release": "node scripts/build-release.mjs",
-    "build:catalog-release": "node scripts/build-catalog-release.mjs"
+    "build:catalog-release": "node scripts/build-catalog-release.mjs",
+    "lint": "eslint .",
+    "format": "eslint --fix . && prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10"
   }
 }

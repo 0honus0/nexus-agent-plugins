@@ -12,202 +12,356 @@ const semver = /^\d+\.\d+\.\d+$/;
 const appId = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/;
 const intentId = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
 const supportedNexusMajor = 1;
+
 const semverMajor = (value) => Number(value.split('.')[0]);
+
 const allowedCapabilities = new Set([
-  'file.read',
-  'file.write',
-  'file.delete',
-  'machine.inspect',
-  'host.inspect',
-  'shell.execute',
-  'machine.docker.manage',
-  'browser.read',
-  'browser.interact',
-  'integration.mcp.read',
-  'integration.mcp.invoke',
-  'integration.acp.invoke',
-  'artifacts.read',
-  'artifacts.write',
-  'context.read',
-  'context.compact',
-  'memory.read',
-  'memory.propose',
-  'app.intents.exchange',
+	'file.read',
+	'file.write',
+	'file.delete',
+	'machine.inspect',
+	'host.inspect',
+	'shell.execute',
+	'machine.docker.manage',
+	'browser.read',
+	'browser.interact',
+	'integration.mcp.read',
+	'integration.mcp.invoke',
+	'integration.acp.invoke',
+	'artifacts.read',
+	'artifacts.write',
+	'context.read',
+	'context.compact',
+	'memory.read',
+	'memory.propose',
+	'app.intents.exchange',
+	'plugin.invoke',
 ]);
 const allowedSkillFields = new Set(['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools']);
 const standardSkillName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const officialPublisherPath = path.join(root, 'catalog', 'official-publisher.json');
 try {
-  const publisher = JSON.parse(fs.readFileSync(officialPublisherPath, 'utf8'));
-  if (
-    publisher?.schemaVersion !== 1 ||
-    typeof publisher?.keyId !== 'string' ||
-    typeof publisher?.label !== 'string' ||
-    !publisher.label.trim() ||
-    typeof publisher?.publicKeyPem !== 'string'
-  ) {
-    failures.push('catalog/official-publisher.json: invalid publisher metadata');
-  } else {
-    const publicKey = createPublicKey(publisher.publicKeyPem);
-    if (publicKey.asymmetricKeyType !== 'ed25519') {
-      failures.push('catalog/official-publisher.json: public key must be Ed25519');
-    } else {
-      const publicDer = publicKey.export({ type: 'spki', format: 'der' });
-      const derivedKeyId = `ed25519:${createHash('sha256').update(publicDer).digest('hex')}`;
-      if (publisher.keyId !== derivedKeyId) {
-        failures.push(
-          `catalog/official-publisher.json: keyId mismatch; expected ${derivedKeyId}`,
-        );
-      }
-    }
-  }
+	const publisher = JSON.parse(fs.readFileSync(officialPublisherPath, 'utf8'));
+	if (
+		publisher?.schemaVersion !== 1 ||
+		typeof publisher?.keyId !== 'string' ||
+		typeof publisher?.label !== 'string' ||
+		!publisher.label.trim() ||
+		typeof publisher?.publicKeyPem !== 'string'
+	) {
+		failures.push('catalog/official-publisher.json: invalid publisher metadata');
+	} else {
+		const publicKey = createPublicKey(publisher.publicKeyPem);
+		if (publicKey.asymmetricKeyType !== 'ed25519') {
+			failures.push('catalog/official-publisher.json: public key must be Ed25519');
+		} else {
+			const publicDer = publicKey.export({ type: 'spki', format: 'der' });
+			const derivedKeyId = `ed25519:${createHash('sha256').update(publicDer).digest('hex')}`;
+			if (publisher.keyId !== derivedKeyId) {
+				failures.push(`catalog/official-publisher.json: keyId mismatch; expected ${derivedKeyId}`);
+			}
+		}
+	}
 } catch {
-  failures.push('catalog/official-publisher.json: must contain a valid Ed25519 public key');
+	failures.push('catalog/official-publisher.json: must contain a valid Ed25519 public key');
 }
 
 const ids = new Set();
 for (const entry of fs.readdirSync(pluginsRoot, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-  if (!entry.isDirectory()) continue;
-  const pluginRoot = path.join(pluginsRoot, entry.name);
-  const manifestPath = path.join(pluginRoot, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    failures.push(`${entry.name}: manifest.json is required`);
-    continue;
-  }
-  let manifest;
-  try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); }
-  catch { failures.push(`${entry.name}: manifest.json must be valid JSON`); continue; }
-  const manifestFields = ['schemaVersion', 'id', 'version', 'displayName', 'sdkVersion', 'capabilities', 'intents', 'frontendEntry', 'backendEntry'];
-  if (Object.keys(manifest).length !== manifestFields.length || Object.keys(manifest).some((key) => !manifestFields.includes(key))) failures.push(`${entry.name}: manifest must use the current exact field set`);
-  if (manifest.schemaVersion !== 1) failures.push(`${entry.name}: schemaVersion must be 1`);
-  if (typeof manifest.id !== 'string' || !appId.test(manifest.id)) failures.push(`${entry.name}: invalid id`);
-  if (ids.has(manifest.id)) failures.push(`${entry.name}: duplicate id ${manifest.id}`);
-  ids.add(manifest.id);
-  if (entry.name !== manifest.id) failures.push(`${entry.name}: directory must match manifest id ${manifest.id}`);
-  if (typeof manifest.version !== 'string' || !semver.test(manifest.version)) failures.push(`${entry.name}: version must be semver x.y.z`);
-  if (typeof manifest.displayName !== 'string' || !manifest.displayName.trim()) failures.push(`${entry.name}: displayName is required`);
-  if (manifest.sdkVersion !== '1') failures.push(`${entry.name}: sdkVersion must be the exact string 1`);
-  if (!nexusCompatibility || typeof nexusCompatibility !== 'object' || Array.isArray(nexusCompatibility)) {
-    failures.push(`${entry.name}: nexus compatibility range is required`);
-  } else {
-    const minVersion = nexusCompatibility.minVersion;
-    const maxVersion = nexusCompatibility.maxVersion;
-    if (typeof minVersion !== 'string' || !semver.test(minVersion)) failures.push(`${entry.name}: nexus.minVersion must be semver x.y.z`);
-    if (typeof maxVersion !== 'string' || !semver.test(maxVersion)) failures.push(`${entry.name}: nexus.maxVersion must be semver x.y.z`);
-    if (semver.test(minVersion ?? '') && semverMajor(minVersion) !== supportedNexusMajor) failures.push(`${entry.name}: nexus.minVersion must remain on supported major ${supportedNexusMajor}`);
-    if (semver.test(maxVersion ?? '') && semverMajor(maxVersion) !== supportedNexusMajor) failures.push(`${entry.name}: nexus.maxVersion must remain on supported major ${supportedNexusMajor}`);
-    if (semver.test(minVersion ?? '') && semver.test(maxVersion ?? '')) {
-      const parts = (value) => value.split('.').map(Number);
-      const compare = (left, right) => {
-        const a = parts(left); const b = parts(right);
-        for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] - b[i];
-        return 0;
-      };
-      if (compare(minVersion, maxVersion) > 0) failures.push(`${entry.name}: nexus.minVersion must not exceed nexus.maxVersion`);
-    }
-  }
-  if (!Array.isArray(manifest.capabilities)) {
-    failures.push(`${entry.name}: capabilities must be an array`);
-  } else {
-    const seen = new Set();
-    for (const capability of manifest.capabilities) {
-      if (typeof capability !== 'string' || !allowedCapabilities.has(capability)) failures.push(`${entry.name}: unknown capability ${String(capability)}`);
-      if (seen.has(capability)) failures.push(`${entry.name}: duplicate capability ${capability}`);
-      seen.add(capability);
-    }
-  }
-  if (!Array.isArray(manifest.intents)) {
-    failures.push(`${entry.name}: intents must be an array`);
-  } else {
-    const seen = new Set();
-    for (const intent of manifest.intents) {
-      if (!intent || typeof intent !== 'object' || Array.isArray(intent) || typeof intent.id !== 'string' || !intentId.test(intent.id) || !Number.isSafeInteger(intent.schemaVersion) || intent.schemaVersion < 1) {
-        failures.push(`${entry.name}: invalid intent`);
-        continue;
-      }
-      if (seen.has(intent.id)) failures.push(`${entry.name}: duplicate intent ${intent.id}`);
-      seen.add(intent.id);
-    }
-  }
-  for (const target of ['frontend', 'backend']) {
-    const value = manifest[`${target}Entry`];
-    if (value === null) continue;
-    if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 1024 ||
-        !value.startsWith(`${target}/`) || value.includes('\\') ||
-        value.split('/').some((part) => part.startsWith('.') || !/^[A-Za-z0-9_.-]{1,255}$/.test(part)) ||
-        !fs.existsSync(path.join(pluginRoot, value))) {
-      failures.push(`${entry.name}: invalid or missing ${target}Entry`);
-    }
-  }
-  const walk = (dir) => {
-    for (const child of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, child.name);
-      if (child.isSymbolicLink()) failures.push(`${path.relative(root, full)}: symlinks are forbidden`);
-      else if (child.isDirectory()) walk(full);
-      else if (!child.isFile()) failures.push(`${path.relative(root, full)}: unsupported filesystem entry`);
-    }
-  };
-  walk(pluginRoot);
-  const skillsRoot = path.join(pluginRoot, 'skills');
-  if (fs.existsSync(skillsRoot)) {
-    const skillIds = new Set();
-    const skillEntries = fs.readdirSync(skillsRoot, { withFileTypes: true });
-    for (const skillEntry of skillEntries) {
-      if (!skillEntry.isDirectory()) failures.push(`${entry.name}: skills/ may contain only Skill directories`);
-    }
-    const skillDirs = skillEntries.filter((candidate) => candidate.isDirectory());
-    if (skillDirs.length > 64) failures.push(`${entry.name}: at most 64 Skills are allowed`);
-    for (const skillDir of skillDirs) {
-      const childEntries = fs.readdirSync(path.join(skillsRoot, skillDir.name), { withFileTypes: true });
-      if (childEntries.length !== 1 || !childEntries[0]?.isFile() || childEntries[0].name !== 'SKILL.md') {
-        failures.push(`${entry.name}: skills/${skillDir.name}/ must contain exactly one SKILL.md file`);
-      }
-      const skillPath = path.join(skillsRoot, skillDir.name, 'SKILL.md');
-      if (!fs.existsSync(skillPath)) { failures.push(`${entry.name}: missing skills/${skillDir.name}/SKILL.md`); continue; }
-      const content = fs.readFileSync(skillPath, 'utf8');
-      const end = content.startsWith('---\n') ? content.indexOf('\n---\n', 4) : -1;
-      if (end < 0) { failures.push(`${entry.name}: invalid Skill frontmatter in ${skillDir.name}`); continue; }
-      const fields = new Map();
-      let frontmatterInvalid = false;
-      for (const line of content.slice(4, end).split('\n')) {
-        if (!line.trim() || line.trimStart().startsWith('#') || /^\s/.test(line)) continue;
-        const match = /^([A-Za-z0-9_-]+):(?:\s*(.*))?$/.exec(line);
-        if (!match || fields.has(match[1])) {
-          frontmatterInvalid = true;
-          continue;
-        }
-        fields.set(match[1], (match[2] ?? '').trim());
-      }
-      if (frontmatterInvalid || [...fields.keys()].some((field) => !allowedSkillFields.has(field))) {
-        failures.push(`${entry.name}: invalid Skill frontmatter fields in ${skillDir.name}`);
-      }
-      const name = fields.get('name') ?? '';
-      const description = fields.get('description') ?? '';
-      const id = `${manifest.id}.${name}`;
-      if (
-        !name ||
-        name.length > 64 ||
-        !standardSkillName.test(name) ||
-        name !== skillDir.name ||
-        Buffer.byteLength(name, 'utf8') > 128
-      ) {
-        failures.push(`${entry.name}: invalid Skill name in ${skillDir.name}`);
-      }
-      if (!description || Buffer.byteLength(description, 'utf8') > 1024) {
-        failures.push(`${entry.name}: invalid Skill description in ${skillDir.name}`);
-      }
-      if (!/^[a-z0-9][a-z0-9._-]{2,127}$/.test(id)) failures.push(`${entry.name}: invalid derived Skill id ${id}`);
-      if (skillIds.has(id)) failures.push(`${entry.name}: duplicate Skill id ${id}`);
-      skillIds.add(id);
-      if (Buffer.byteLength(content, 'utf8') > 12 * 1024) failures.push(`${entry.name}: Skill body too large in ${skillDir.name}`);
-    }
-  }
+	if (!entry.isDirectory()) {
+		continue;
+	}
+	const pluginRoot = path.join(pluginsRoot, entry.name);
+	const manifestPath = path.join(pluginRoot, 'manifest.json');
+	if (!fs.existsSync(manifestPath)) {
+		failures.push(`${entry.name}: manifest.json is required`);
+		continue;
+	}
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+	} catch {
+		failures.push(`${entry.name}: manifest.json must be valid JSON`);
+		continue;
+	}
+	const manifestFields = [
+		'schemaVersion',
+		'id',
+		'version',
+		'displayName',
+		'sdkVersion',
+		'capabilities',
+		'intents',
+		'frontendEntry',
+		'backendEntry',
+	];
+	if (
+		Object.keys(manifest).length !== manifestFields.length ||
+		Object.keys(manifest).some((key) => !manifestFields.includes(key))
+	) {
+		failures.push(`${entry.name}: manifest must use the current exact field set`);
+	}
+	if (manifest.schemaVersion !== 1) {
+		failures.push(`${entry.name}: schemaVersion must be 1`);
+	}
+	if (typeof manifest.id !== 'string' || !appId.test(manifest.id)) {
+		failures.push(`${entry.name}: invalid id`);
+	}
+	if (ids.has(manifest.id)) {
+		failures.push(`${entry.name}: duplicate id ${manifest.id}`);
+	}
+	ids.add(manifest.id);
+	if (entry.name !== manifest.id) {
+		failures.push(`${entry.name}: directory must match manifest id ${manifest.id}`);
+	}
+	if (typeof manifest.version !== 'string' || !semver.test(manifest.version)) {
+		failures.push(`${entry.name}: version must be semver x.y.z`);
+	}
+	if (typeof manifest.displayName !== 'string' || !manifest.displayName.trim()) {
+		failures.push(`${entry.name}: displayName is required`);
+	}
+	if (manifest.sdkVersion !== '1') {
+		failures.push(`${entry.name}: sdkVersion must be the exact string 1`);
+	}
+	if (!nexusCompatibility || typeof nexusCompatibility !== 'object' || Array.isArray(nexusCompatibility)) {
+		failures.push(`${entry.name}: nexus compatibility range is required`);
+	} else {
+		const minVersion = nexusCompatibility.minVersion;
+		const maxVersion = nexusCompatibility.maxVersion;
+		if (typeof minVersion !== 'string' || !semver.test(minVersion)) {
+			failures.push(`${entry.name}: nexus.minVersion must be semver x.y.z`);
+		}
+		if (typeof maxVersion !== 'string' || !semver.test(maxVersion)) {
+			failures.push(`${entry.name}: nexus.maxVersion must be semver x.y.z`);
+		}
+		if (semver.test(minVersion ?? '') && semverMajor(minVersion) !== supportedNexusMajor) {
+			failures.push(`${entry.name}: nexus.minVersion must remain on supported major ${supportedNexusMajor}`);
+		}
+		if (semver.test(maxVersion ?? '') && semverMajor(maxVersion) !== supportedNexusMajor) {
+			failures.push(`${entry.name}: nexus.maxVersion must remain on supported major ${supportedNexusMajor}`);
+		}
+		if (semver.test(minVersion ?? '') && semver.test(maxVersion ?? '')) {
+			const parts = (value) => value.split('.').map(Number);
+
+			const compare = (left, right) => {
+				const a = parts(left);
+				const b = parts(right);
+				for (let i = 0; i < 3; i += 1) {
+					if (a[i] !== b[i]) {
+						return a[i] - b[i];
+					}
+				}
+				return 0;
+			};
+
+			if (compare(minVersion, maxVersion) > 0) {
+				failures.push(`${entry.name}: nexus.minVersion must not exceed nexus.maxVersion`);
+			}
+		}
+	}
+	if (!Array.isArray(manifest.capabilities)) {
+		failures.push(`${entry.name}: capabilities must be an array`);
+	} else {
+		const seen = new Set();
+		for (const capability of manifest.capabilities) {
+			if (typeof capability !== 'string' || !allowedCapabilities.has(capability)) {
+				failures.push(`${entry.name}: unknown capability ${String(capability)}`);
+			}
+			if (seen.has(capability)) {
+				failures.push(`${entry.name}: duplicate capability ${capability}`);
+			}
+			seen.add(capability);
+		}
+	}
+	if (!Array.isArray(manifest.intents)) {
+		failures.push(`${entry.name}: intents must be an array`);
+	} else {
+		const seen = new Set();
+		for (const intent of manifest.intents) {
+			if (
+				!intent ||
+				typeof intent !== 'object' ||
+				Array.isArray(intent) ||
+				typeof intent.id !== 'string' ||
+				!intentId.test(intent.id) ||
+				!Number.isSafeInteger(intent.schemaVersion) ||
+				intent.schemaVersion < 1
+			) {
+				failures.push(`${entry.name}: invalid intent`);
+				continue;
+			}
+			if (seen.has(intent.id)) {
+				failures.push(`${entry.name}: duplicate intent ${intent.id}`);
+			}
+			seen.add(intent.id);
+		}
+	}
+	for (const target of ['frontend', 'backend']) {
+		const value = manifest[`${target}Entry`];
+		if (value === null) {
+			continue;
+		}
+		if (
+			typeof value !== 'string' ||
+			Buffer.byteLength(value, 'utf8') > 1024 ||
+			!value.startsWith(`${target}/`) ||
+			value.includes('\\') ||
+			value.split('/').some((part) => part.startsWith('.') || !/^[A-Za-z0-9_.-]{1,255}$/.test(part)) ||
+			!fs.existsSync(path.join(pluginRoot, value))
+		) {
+			failures.push(`${entry.name}: invalid or missing ${target}Entry`);
+		}
+	}
+	const agentPath = path.join(pluginRoot, 'agent.json');
+	if (fs.existsSync(agentPath)) {
+		try {
+			const bytes = fs.readFileSync(agentPath);
+			const agent = JSON.parse(bytes.toString('utf8'));
+			const fields = ['schemaVersion', 'role', 'toolNames', 'beforeStep', 'tools'];
+
+			const name = (value) => typeof value === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(value);
+
+			const text = (value) => typeof value === 'string' && !value.includes('\0');
+
+			if (
+				!agent ||
+				typeof agent !== 'object' ||
+				Array.isArray(agent) ||
+				Object.keys(agent).length !== fields.length ||
+				Object.keys(agent).some((key) => !fields.includes(key)) ||
+				bytes.byteLength > 512 * 1024 - 1024 ||
+				agent.schemaVersion !== 1 ||
+				!text(agent.role) ||
+				typeof agent.beforeStep !== 'boolean' ||
+				!Array.isArray(agent.tools) ||
+				(agent.toolNames !== null &&
+					(!Array.isArray(agent.toolNames) ||
+						!agent.toolNames.every(name) ||
+						new Set(agent.toolNames).size !== agent.toolNames.length)) ||
+				!agent.tools.every(
+					(tool) =>
+						tool &&
+						typeof tool === 'object' &&
+						!Array.isArray(tool) &&
+						Object.keys(tool).length === 2 &&
+						Object.hasOwn(tool, 'name') &&
+						Object.hasOwn(tool, 'description') &&
+						name(tool.name) &&
+						text(tool.description) &&
+						tool.description.trim(),
+				) ||
+				new Set(agent.tools.map((tool) => tool.name)).size !== agent.tools.length
+			) {
+				throw new Error('Invalid Agent contribution');
+			}
+			if ((agent.beforeStep || agent.tools.length) && manifest.backendEntry === null) {
+				throw new Error('Agent hooks/tools require a backendEntry');
+			}
+			if (agent.tools.length && !manifest.capabilities?.includes('plugin.invoke')) {
+				throw new Error('Custom tools require plugin.invoke');
+			}
+			if (agent.beforeStep && !manifest.capabilities?.includes('context.read')) {
+				throw new Error('Context hooks require context.read');
+			}
+		} catch {
+			failures.push(`${entry.name}: invalid agent.json contribution`);
+		}
+	}
+
+	const walk = (dir) => {
+		for (const child of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, child.name);
+			if (child.isSymbolicLink()) {
+				failures.push(`${path.relative(root, full)}: symlinks are forbidden`);
+			} else if (child.isDirectory()) {
+				walk(full);
+			} else if (!child.isFile()) {
+				failures.push(`${path.relative(root, full)}: unsupported filesystem entry`);
+			}
+		}
+	};
+
+	walk(pluginRoot);
+	const skillsRoot = path.join(pluginRoot, 'skills');
+	if (fs.existsSync(skillsRoot)) {
+		const skillIds = new Set();
+		const skillEntries = fs.readdirSync(skillsRoot, { withFileTypes: true });
+		for (const skillEntry of skillEntries) {
+			if (!skillEntry.isDirectory()) {
+				failures.push(`${entry.name}: skills/ may contain only Skill directories`);
+			}
+		}
+		const skillDirs = skillEntries.filter((candidate) => candidate.isDirectory());
+		if (skillDirs.length > 64) {
+			failures.push(`${entry.name}: at most 64 Skills are allowed`);
+		}
+		for (const skillDir of skillDirs) {
+			const childEntries = fs.readdirSync(path.join(skillsRoot, skillDir.name), { withFileTypes: true });
+			if (childEntries.length !== 1 || !childEntries[0]?.isFile() || childEntries[0].name !== 'SKILL.md') {
+				failures.push(`${entry.name}: skills/${skillDir.name}/ must contain exactly one SKILL.md file`);
+			}
+			const skillPath = path.join(skillsRoot, skillDir.name, 'SKILL.md');
+			if (!fs.existsSync(skillPath)) {
+				failures.push(`${entry.name}: missing skills/${skillDir.name}/SKILL.md`);
+				continue;
+			}
+			const content = fs.readFileSync(skillPath, 'utf8');
+			const end = content.startsWith('---\n') ? content.indexOf('\n---\n', 4) : -1;
+			if (end < 0) {
+				failures.push(`${entry.name}: invalid Skill frontmatter in ${skillDir.name}`);
+				continue;
+			}
+			const fields = new Map();
+			let frontmatterInvalid = false;
+			for (const line of content.slice(4, end).split('\n')) {
+				if (!line.trim() || line.trimStart().startsWith('#') || /^\s/.test(line)) {
+					continue;
+				}
+				const match = /^([A-Za-z0-9_-]+):(?:\s*(.*))?$/.exec(line);
+				if (!match || fields.has(match[1])) {
+					frontmatterInvalid = true;
+					continue;
+				}
+				fields.set(match[1], (match[2] ?? '').trim());
+			}
+			if (frontmatterInvalid || [...fields.keys()].some((field) => !allowedSkillFields.has(field))) {
+				failures.push(`${entry.name}: invalid Skill frontmatter fields in ${skillDir.name}`);
+			}
+			const name = fields.get('name') ?? '';
+			const description = fields.get('description') ?? '';
+			const id = `${manifest.id}.${name}`;
+			if (
+				!name ||
+				name.length > 64 ||
+				!standardSkillName.test(name) ||
+				name !== skillDir.name ||
+				Buffer.byteLength(name, 'utf8') > 128
+			) {
+				failures.push(`${entry.name}: invalid Skill name in ${skillDir.name}`);
+			}
+			if (!description || Buffer.byteLength(description, 'utf8') > 1024) {
+				failures.push(`${entry.name}: invalid Skill description in ${skillDir.name}`);
+			}
+			if (!/^[a-z0-9][a-z0-9._-]{2,127}$/.test(id)) {
+				failures.push(`${entry.name}: invalid derived Skill id ${id}`);
+			}
+			if (skillIds.has(id)) {
+				failures.push(`${entry.name}: duplicate Skill id ${id}`);
+			}
+			skillIds.add(id);
+			if (Buffer.byteLength(content, 'utf8') > 12 * 1024) {
+				failures.push(`${entry.name}: Skill body too large in ${skillDir.name}`);
+			}
+		}
+	}
 }
-if (!ids.size) failures.push('plugins/: at least one plugin is required');
+if (!ids.size) {
+	failures.push('plugins/: at least one plugin is required');
+}
 if (failures.length) {
-  console.error('Plugin repository check failed:');
-  failures.forEach((failure) => console.error(`- ${failure}`));
-  process.exit(1);
+	console.error('Plugin repository check failed:');
+	failures.forEach((failure) => console.error(`- ${failure}`));
+	process.exit(1);
 }
 console.log(`Plugin repository check passed: ${ids.size} plugin(s).`);
