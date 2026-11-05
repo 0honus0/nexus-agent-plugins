@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "nexus.agent",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "displayName": "Nexus Agent",
   "sdkVersion": "1",
   "capabilities": [
