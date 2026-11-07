@@ -468,6 +468,20 @@ export async function run(input, context) {
 				}
 				let text;
 				if (reply.kind === 'rejected') {
+					if (
+						[
+							'host_key_untrusted',
+							'version_conflict',
+							'provider_configuration_stale',
+							'operation_unknown',
+							'storage_unavailable',
+							'internal_failure',
+						].includes(reply.code)
+					) {
+						// Fresh authority or uncertain persistence needs user/Host recovery,
+						// never a new model proposal that repeats the rejected command.
+						throw new PluginCapabilityFailure(reply.code);
+					}
 					text = JSON.stringify({
 						failure: { code: reply.code },
 						guidance: 'Inspect recorded child effects before retrying any write.',
