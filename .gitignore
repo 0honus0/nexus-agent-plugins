@@ -12,3 +12,5 @@ plugins/nexus.services.*/backend/
 plugins/nexus.services.*/frontend/
 
 templates/*/backend/
+
+plugins/nexus.agent/frontend/
