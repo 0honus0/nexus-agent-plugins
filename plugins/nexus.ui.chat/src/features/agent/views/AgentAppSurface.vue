@@ -709,8 +709,8 @@
 		}
 	}
 
-	function selectNativeThread(value: NativeThread | null): void {
-		threadDrawerOpen.value = false;
+	function selectNativeThread(value: NativeThread | null, origin: 'automatic' | 'interaction'): void {
+		if (origin === 'interaction') threadDrawerOpen.value = false;
 		pendingThreadSelection.value = value;
 		if (value) void applyThreadSelection();
 		else runtime.clearThread();

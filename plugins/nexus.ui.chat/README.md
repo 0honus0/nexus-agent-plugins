@@ -17,3 +17,5 @@ pnpm --dir plugins/nexus.ui.chat build
 The build writes UI assets to `frontend/` and provenance to `SOURCE-MANIFEST.json` from current local sources and the Shared archive, with the external Host runtime URL recorded separately. The manifest records what was built; it is generated output, not a frozen source input. Signing and catalog release use the repository release commands.
 
 The `tests/` suites exercise transcript identity, paged history, malformed-page atomicity, request failure outcomes and subscription cleanup against the actual UI modules. The repository-wide test command includes them; signed installation and browser interaction are verified by Host E2E.
+
+Automatic conversation restoration preserves an already opened narrow-screen drawer. Explicit thread selection still dismisses the drawer.

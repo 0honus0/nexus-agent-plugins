@@ -14,7 +14,7 @@ export function useNativeThreads(
 	appId: string,
 	api: NativeThreadApi,
 	active: () => boolean,
-	select: (value: NativeThread | null) => void,
+	select: (value: NativeThread | null, origin: 'automatic' | 'interaction') => void,
 	removed: (threadId: string) => void,
 	restoreThreadId?: () => string | null,
 ) {
@@ -122,7 +122,7 @@ export function useNativeThreads(
 					selected.value = null;
 					title.value = '';
 					if (items.value.length === 0) {
-						select(null);
+						select(null, 'automatic');
 					}
 				}
 				nextCursor.value = result.page.nextCursor;
@@ -139,7 +139,7 @@ export function useNativeThreads(
 						items.value.reduce((latest, item) => (item.updatedAt > latest.updatedAt ? item : latest));
 					selected.value = newest;
 					title.value = newest.title;
-					select(newest);
+					select(newest, 'automatic');
 				}
 				if (pendingDelete.value) {
 					deleteInspected.value = true;
@@ -151,7 +151,7 @@ export function useNativeThreads(
 							const replacement = items.value[0] ?? null;
 							selected.value = replacement;
 							title.value = replacement?.title ?? '';
-							select(replacement);
+							select(replacement, 'automatic');
 						}
 					}
 				}
@@ -223,12 +223,12 @@ export function useNativeThreads(
 		if (selected.value?.id === value.id) {
 			// Selecting the current thread still dismisses the narrow-screen drawer.
 			// The runtime owns skipping a redundant conversation read.
-			select(selected.value);
+			select(selected.value, 'interaction');
 			return;
 		}
 		selected.value = value;
 		title.value = value.title;
-		select(value);
+		select(value, 'interaction');
 	}
 
 	function newThread(): void {
@@ -270,7 +270,7 @@ export function useNativeThreads(
 				if (wasSelected) {
 					selected.value = replacement;
 					title.value = replacement?.title ?? '';
-					select(replacement);
+					select(replacement, 'automatic');
 				}
 			},
 			{
@@ -375,7 +375,7 @@ export function useNativeThreads(
 				}
 				selected.value = latest;
 				title.value = latest.title;
-				select(latest);
+				select(latest, 'interaction');
 			},
 			{
 				write: true,

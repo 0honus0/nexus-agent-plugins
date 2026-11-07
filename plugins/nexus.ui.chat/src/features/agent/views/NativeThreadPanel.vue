@@ -18,7 +18,7 @@
 		apiBase?: '/api/v1/agent' | '/__next/api/v1/agent';
 	}>();
 	const emit = defineEmits<{
-		select: [value: NativeThread | null];
+		select: [value: NativeThread | null, origin: 'automatic' | 'interaction'];
 		removed: [threadId: string];
 		working: [value: boolean];
 	}>();
@@ -31,7 +31,7 @@
 			appVersion === undefined ? undefined : async (appId) => ({ appId, appVersion }),
 		),
 		() => props.active,
-		(value) => emit('select', value),
+		(value, origin) => emit('select', value, origin),
 		(threadId) => emit('removed', threadId),
 		() => props.restoreThreadId ?? null,
 	);

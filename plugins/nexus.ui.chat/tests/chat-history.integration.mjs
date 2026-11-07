@@ -14,17 +14,32 @@ await build({
 	configFile: false,
 	root,
 	logLevel: 'error',
-	resolve: { alias: { '@': resolve(root, 'src') } },
+	resolve: {
+		alias: [
+			{ find: '@/features/agent/composables/use-agent-management-operation', replacement: '\0thread-operation' },
+			{ find: '@', replacement: resolve(root, 'src') },
+		],
+	},
 	plugins: [
 		{
 			name: 'chat-history-test-entry',
 			resolveId(source) {
 				if (source === entry) return '\0' + entry;
+				if (source.includes('/features/agent/composables/use-agent-management-operation'))
+					return '\0thread-operation';
 			},
 			load(id) {
+				if (id === '\0thread-operation')
+					return `
+import { ref } from 'vue';
+export function useAgentManagementOperation() {
+ return { busy: ref(false), refreshRequired: ref(false), notice: ref(''),
+ async execute(read, apply) { apply(await read(new AbortController().signal)); } };
+}`;
 				if (id !== '\0' + entry) return;
 				return [
 					'export { ref } from "vue";',
+					'export { useNativeThreads } from "@/features/agent/composables/use-native-threads";',
 					'export * from "@/features/agent/model/native-run-rules";',
 					'export { useNativeTranscript } from "@/features/agent/composables/use-native-transcript";',
 				].join('\n');
@@ -136,4 +151,36 @@ test('Agent history releases only whole offscreen messages and restores the exac
 	assert.equal(result.prefix.startsWith('1:'), true);
 	assert.equal(result.oldText.startsWith('2:'), true);
 	assert.equal(result.retainedIdentity && result.noOrphan && result.toolRestored && result.initialTool, true);
+});
+
+test('late conversation restoration preserves drawer intent while explicit choices remain interactive', async () => {
+	const { useNativeThreads } = await import(pathToFileURL(join(output, 'history.mjs')).href);
+	const first = { id: 'thread-one', appId: 'app', title: 'First', version: 1, createdAt: 1, updatedAt: 1 };
+	const second = { ...first, id: 'thread-two', title: 'Second', updatedAt: 2 };
+	let deliver;
+	const selections = [];
+	const editor = useNativeThreads(
+		'app',
+		{
+			scope: async () => ({ appId: 'app', appVersion: 1 }),
+			list: () =>
+				new Promise((resolve) => {
+					deliver = resolve;
+				}),
+		},
+		() => true,
+		(value, origin) => selections.push({ id: value?.id, origin }),
+		() => {},
+	);
+	const loading = editor.refresh();
+	await Promise.resolve();
+	deliver({ items: [first, second], nextCursor: null });
+	await loading;
+	assert.deepEqual(selections, [{ id: second.id, origin: 'automatic' }]);
+	editor.choose(second);
+	editor.choose(first);
+	assert.deepEqual(selections.slice(1), [
+		{ id: second.id, origin: 'interaction' },
+		{ id: first.id, origin: 'interaction' },
+	]);
 });

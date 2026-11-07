@@ -334,21 +334,26 @@ for (const code of ['provider_request_failed', 'operation_unknown', 'storage_una
 
 for (const code of [
 	'host_key_untrusted',
-	'version_conflict',
 	'provider_configuration_stale',
 	'operation_unknown',
 	'storage_unavailable',
 	'internal_failure',
+	'version_conflict',
 ]) {
-	await test(`Unsafe tool refusal ${code} stops the App before another model proposal`, async () => {
+	await test(`Tool refusal ${code} preserves recovery and retry authority`, async () => {
 		const bindingId = randomUUID();
+		let modelRequests = 0;
+		let invocations = 0;
 		const f = await fixture({
-			model: () => ({
-				text: '',
-				finishReason: 'tool_calls',
-				reasoning: [],
-				toolCalls: [{ id: 'call-original', name: 'fixture_read', bindingId, argumentsJson: '{}' }],
-			}),
+			model: () =>
+				++modelRequests > 1
+					? answer()
+					: {
+							text: '',
+							finishReason: 'tool_calls',
+							reasoning: [],
+							toolCalls: [{ id: 'call-original', name: 'fixture_read', bindingId, argumentsJson: '{}' }],
+						},
 		});
 		f.context.directory = {
 			discover: async () => ({
@@ -368,12 +373,22 @@ for (const code of [
 				},
 			}),
 
-			invoke: async () => ({ kind: 'rejected', code }),
+			invoke: async () => {
+				invocations += 1;
+				return { kind: 'rejected', code };
+			},
 		};
-		await assert.rejects(
-			run(f.input, f.context),
-			(error) => error instanceof PluginCapabilityFailure && error.code === code,
-		);
-		assert.equal(f.dispatches.length, 1, 'No model continuation or retry after an unsafe refusal');
+		if (code === 'version_conflict') {
+			await run(f.input, f.context);
+			assert.equal((await f.state()).phase.kind, 'done');
+			assert.equal(modelRequests, 2, 'A definite stale input is returned to the model for correction');
+			assert.equal(invocations, 1, 'The original tool is never retried automatically');
+		} else {
+			await assert.rejects(
+				run(f.input, f.context),
+				(error) => error instanceof PluginCapabilityFailure && error.code === code,
+			);
+			assert.equal(f.dispatches.length, 1, 'No model continuation after an unsafe refusal');
+		}
 	});
 }
