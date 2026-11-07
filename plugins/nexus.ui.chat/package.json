@@ -1,0 +1,48 @@
+{
+  "name": "@nexus-plugins/ui-chat",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vue-tsc --noEmit -p tsconfig.json && vite build && node build.mjs",
+    "check": "vue-tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src vite.config.ts",
+    "format": "prettier --write src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",
+    "format:check": "prettier --check src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",
+    "test": "node --test tests/*.integration.mjs"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "7.3.1",
+    "@nexus-terminal/shared": "file:../../sdk/nexus-terminal-shared-4.0.1.tgz",
+    "@noble/hashes": "2.4.0",
+    "@vueuse/core": "15.0.0",
+    "axios": "1.21.0",
+    "docx-preview": "0.4.1",
+    "dompurify": "3.4.17",
+    "marked": "18.1.3",
+    "pdfjs-dist": "6.5.438",
+    "pino": "10.4.0",
+    "reka-ui": "2.11.0",
+    "semver": "7.8.6",
+    "sql.js": "1.15.2",
+    "tailwindcss": "4.3.4",
+    "vue": "3.5.44",
+    "vue-i18n": "11.4.18",
+    "vue-virtual-scroller": "3.0.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "vite": "8.3.5",
+    "@vitejs/plugin-vue": "6.0.10",
+    "@tailwindcss/vite": "4.3.4",
+    "@types/node": "26.6.6",
+    "vue-tsc": "^3.3.14",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "@types/semver": "7.8.0",
+    "@types/sql.js": "1.4.11",
+    "eslint": "^10.14.0",
+    "eslint-plugin-vue": "^10.12.0",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.1"
+  }
+}

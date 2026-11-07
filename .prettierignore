@@ -1,3 +1,12 @@
-node_modules/
-.dist/
-pnpm-lock.yaml
+plugins/nexus.ui.chat/frontend/
+plugins/nexus.ui.chat/SOURCE-MANIFEST.json
+plugins/nexus.ui.chat/dist/
+plugins/nexus.agent/backend/
+plugins/nexus.tools.*/backend/
+plugins/nexus.services.*/backend/
+plugins/nexus.services.*/frontend/
+
+sdk/*.mjs
+plugins/nexus.agent/frontend/
+
+templates/*/backend/

@@ -1,20 +1,51 @@
 {
   "name": "nexus-agent-plugins",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.28.10",
+  "packageManager": "pnpm@12.16.1",
   "scripts": {
-    "check": "pnpm run lint && pnpm run format:check && node scripts/check.mjs",
+    "check": "pnpm run lint && pnpm run format:check && node scripts/check.mjs && pnpm run check:composition && pnpm --dir plugins/nexus.ui.chat run lint && pnpm --dir plugins/nexus.ui.chat run check && pnpm --dir plugins/nexus.ui.chat run format:check",
     "build:package": "node scripts/build-package.mjs",
     "build:release": "node scripts/build-release.mjs",
     "build:catalog-release": "node scripts/build-catalog-release.mjs",
     "lint": "eslint .",
     "format": "eslint --fix . && prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "verify:package": "node scripts/verify-package.mjs",
+    "test": "pnpm run build:tools && pnpm run test:repository && pnpm run test:plugins",
+    "check:composition": "node scripts/check-composition.mjs",
+    "build:staging": "node scripts/build-staging.mjs",
+    "build:tools": "node plugins/nexus.tools.remote/build.mjs && node plugins/nexus.tools.browser/build.mjs && node plugins/nexus.tools.integrations/build.mjs && node plugins/nexus.tools.agent/build.mjs",
+    "build:app": "node plugins/nexus.agent/build.mjs",
+    "build:ui": "pnpm --dir plugins/nexus.ui.chat run build",
+    "build": "pnpm run build:tools && pnpm run build:services && pnpm run build:app && pnpm run build:ui && pnpm run build:templates",
+    "test:tools": "node --test plugins/nexus.tools.remote/src/algorithms.test.mjs plugins/nexus.tools.browser/test/browser.test.mjs plugins/nexus.tools.integrations/test/integrations.test.mjs plugins/nexus.tools.agent/src/algorithms.test.mjs",
+    "build:services": "node plugins/nexus.services.mcp/build.mjs && node plugins/nexus.services.acp/build.mjs",
+    "build:templates": "node scripts/build-templates.mjs",
+    "test:services": "node --test plugins/nexus.services.mcp/test/*.test.mjs plugins/nexus.services.acp/test/*.test.mjs",
+    "test:repository": "node --test scripts/composition.test.mjs scripts/package-release.test.mjs",
+    "test:plugins": "pnpm --recursive --workspace-concurrency=1 --filter './plugins/**' run test"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "4.3.4",
+    "@types/node": "26.6.6",
+    "@vitejs/plugin-vue": "6.0.10",
+    "esbuild": "0.28.2",
     "eslint": "^10.14.0",
-    "prettier": "^3.9.10"
+    "prettier": "^3.9.10",
+    "tailwindcss": "4.3.4",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vite": "8.3.5",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "7.3.1",
+    "@nexus-terminal/shared": "file:sdk/nexus-terminal-shared-4.0.1.tgz",
+    "reka-ui": "2.11.0",
+    "semver": "7.8.6",
+    "tar": "7.5.22",
+    "vue": "3.5.44",
+    "vue-i18n": "11.4.18"
   }
 }

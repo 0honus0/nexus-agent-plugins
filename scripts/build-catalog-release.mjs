@@ -1,78 +1,83 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { compare } from 'semver';
+import { inspectComposition } from './lib/composition.mjs';
+import { readReleaseArtifact, writeImmutable } from './lib/package-artifact.mjs';
+import { readAgentPluginCatalogIndex } from '@nexus-terminal/shared/agent/plugins/repository-http-codec';
 
-const [keyArg, outputArg, baseUrlArg] = process.argv.slice(2);
-if (!keyArg || !outputArg || !baseUrlArg) {
-	console.error(
-		'Usage: node scripts/build-catalog-release.mjs <ed25519-private-key.pem> <output-dir> <release-base-url>',
-	);
-	process.exit(2);
-}
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pluginsRoot = path.join(root, 'plugins');
-const output = path.resolve(outputArg);
-const key = path.resolve(keyArg);
-const baseUrl = baseUrlArg.replace(/\/$/, '');
-const officialPublisher = JSON.parse(fs.readFileSync(path.join(root, 'catalog', 'official-publisher.json'), 'utf8'));
-
-fs.mkdirSync(output, { recursive: true });
-const packages = [];
-let observedPublicKeyPem = null;
-
-for (const entry of fs
-	.readdirSync(pluginsRoot, { withFileTypes: true })
-	.filter((candidate) => candidate.isDirectory())
-	.sort((left, right) => left.name.localeCompare(right.name))) {
-	const source = path.join(pluginsRoot, entry.name);
-	const manifest = JSON.parse(fs.readFileSync(path.join(source, 'manifest.json'), 'utf8'));
-	const packageName = `${manifest.id}-${manifest.version}.tar`;
-	const packagePath = path.join(output, packageName);
-	const metadata = JSON.parse(
-		execFileSync(process.execPath, [path.join(root, 'scripts', 'build-package.mjs'), source, packagePath, key], {
-			encoding: 'utf8',
-		}),
-	);
-	if (
-		metadata.publisherKeyId !== officialPublisher.keyId ||
-		metadata.publicKeyPem.trim() !== officialPublisher.publicKeyPem.trim()
-	) {
-		throw new Error('OFFICIAL_PLUGIN_SIGNING_KEY_MISMATCH');
+const [outputArg, ...inputArgs] = process.argv.slice(2);
+const releaseArgs = [];
+const requiredApps = [];
+for (let index = 0; index < inputArgs.length; index++) {
+	if (inputArgs[index] === '--require-app') {
+		const packageId = inputArgs[++index];
+		if (!packageId || packageId.startsWith('--')) {
+			throw new Error('PLUGIN_CATALOG_APP_SELECTOR_INVALID');
+		}
+		requiredApps.push(packageId);
+	} else {
+		releaseArgs.push(inputArgs[index]);
 	}
-	observedPublicKeyPem ??= metadata.publicKeyPem;
-	packages.push({
-		appId: metadata.appId,
-		version: metadata.version,
-		sdkVersion: metadata.sdkVersion,
-		nexus: metadata.nexus,
-		displayName: metadata.displayName,
-		description: `First-party Nexus plugin: ${metadata.displayName}.`,
-		packageUrl: `${baseUrl}/${packageName}`,
-		sha256: metadata.sha256,
-		sizeBytes: metadata.sizeBytes,
-		publisherKeyId: metadata.publisherKeyId,
-	});
 }
-
-if (!packages.length || !observedPublicKeyPem) {
-	throw new Error('OFFICIAL_PLUGIN_CATALOG_EMPTY');
+if (!outputArg || !releaseArgs.length) {
+	throw new Error(
+		'Usage: node scripts/build-catalog-release.mjs <catalog.json> <package.release.json>... [--require-app packageId]',
+	);
 }
-const catalog = {
-	schemaVersion: 1,
-	publishers: [
+const publishers = new Map();
+const packages = new Map();
+const candidates = [];
+for (const releaseArg of releaseArgs) {
+	const releasePath = path.resolve(releaseArg);
+	const { release, manifest } = readReleaseArtifact(releasePath);
+	const expected = release.package;
+	const priorPublisher = publishers.get(release.publisher.keyId);
+	if (
+		priorPublisher &&
+		(priorPublisher.publicKeyPem !== release.publisher.publicKeyPem ||
+			priorPublisher.label !== release.publisher.label)
+	) {
+		throw new Error('PLUGIN_PUBLISHER_COLLISION');
+	}
+	publishers.set(release.publisher.keyId, release.publisher);
+	const identity = `${expected.publisherKeyId}:${expected.packageId}:${expected.version}`;
+	const prior = packages.get(identity);
+	if (prior && (prior.sha256 !== expected.sha256 || prior.sizeBytes !== expected.sizeBytes)) {
+		throw new Error('PLUGIN_RELEASE_IDENTITY_COLLISION');
+	}
+	if (!prior) {
+		packages.set(identity, expected);
+		candidates.push({ manifest, publisherKeyId: expected.publisherKeyId });
+	}
+}
+const compositions = [];
+for (const packageId of requiredApps) {
+	const matching = candidates.filter((candidate) => candidate.manifest.id === packageId);
+	if (new Set(matching.map((candidate) => candidate.publisherKeyId)).size !== 1) {
+		throw new Error(`PLUGIN_CATALOG_APP_IDENTITY_UNRESOLVED:${packageId}`);
+	}
+	matching.sort((left, right) => compare(right.manifest.version, left.manifest.version));
+	const selected = matching[0];
+	const composition = inspectComposition(selected.manifest, candidates);
+	if (composition.status !== 'complete') {
+		throw new Error(`PLUGIN_CATALOG_APP_INCOMPLETE:${JSON.stringify(composition)}`);
+	}
+	compositions.push({ publisherKeyId: selected.publisherKeyId, ...composition });
+}
+const index = readAgentPluginCatalogIndex({
+	schemaVersion: 2,
+	publishers: [...publishers.values()],
+	packages: [...packages.values()],
+});
+writeImmutable(path.resolve(outputArg), Buffer.from(`${JSON.stringify(index, null, 2)}\n`));
+console.log(
+	JSON.stringify(
 		{
-			keyId: officialPublisher.keyId,
-			label: officialPublisher.label,
-			publicKeyPem: officialPublisher.publicKeyPem,
+			catalogPath: path.resolve(outputArg),
+			packages: index.packages.length,
+			requiredAppCompositions: compositions,
 		},
-	],
-	packages,
-};
-const catalogPath = path.join(output, 'catalog.json');
-fs.writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
-process.stdout.write(
-	`${JSON.stringify({ catalogPath, publisherKeyId: officialPublisher.keyId, packages }, null, 2)}\n`,
+		null,
+		2,
+	),
 );

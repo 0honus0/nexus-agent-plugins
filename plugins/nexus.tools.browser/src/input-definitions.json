@@ -1,0 +1,499 @@
+[
+  {
+    "name": "browser_targets_list",
+    "input": {
+      "fields": []
+    }
+  },
+  {
+    "name": "browser_open",
+    "input": {
+      "fields": [
+        {
+          "name": "targetId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 128,
+          "allowEmpty": false
+        },
+        {
+          "name": "expectedVersion",
+          "kind": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_close",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_snapshot",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "maxNodes",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "include",
+          "kind": "texts",
+          "required": false,
+          "maxItems": 2,
+          "maxItemBytes": 10
+        },
+        {
+          "name": "after",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "limit",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 100
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_screenshot",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_console",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "after",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "limit",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 100
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_navigate",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "url",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 4096,
+          "allowEmpty": false
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_back",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_scroll",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "deltaX",
+          "kind": "integer",
+          "required": false,
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "deltaY",
+          "kind": "integer",
+          "required": true,
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_press",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": false,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": false,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "key",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 32,
+          "allowEmpty": false
+        },
+        {
+          "name": "modifiers",
+          "kind": "texts",
+          "required": false,
+          "maxItems": 4,
+          "maxItemBytes": 16
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_select",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "values",
+          "kind": "texts",
+          "required": true,
+          "maxItemBytes": 523264,
+          "maxItems": 9007199254740991
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_wait",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "mode",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 16,
+          "allowEmpty": false,
+          "choices": ["timeout", "networkIdle"]
+        },
+        {
+          "name": "maxMillis",
+          "kind": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_click",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_type",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "text",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 9007199254740991,
+          "allowEmpty": true
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_upload",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "artifactId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "expectedVersion",
+          "kind": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "sha256",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "settleMs",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2000
+        }
+      ]
+    }
+  },
+  {
+    "name": "browser_download",
+    "input": {
+      "fields": [
+        {
+          "name": "sessionId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "snapshotId",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 36,
+          "allowEmpty": false
+        },
+        {
+          "name": "nodeRef",
+          "kind": "text",
+          "required": true,
+          "maxBytes": 64,
+          "allowEmpty": false
+        },
+        {
+          "name": "maxBytes",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  }
+]

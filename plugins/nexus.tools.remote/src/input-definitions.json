@@ -1,0 +1,540 @@
+[
+  {
+    "name": "host_diagnostics_read",
+    "input": {
+      "fields": []
+    }
+  },
+  {
+    "name": "file_deliver",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "kind": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "paths",
+          "kind": "texts",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 4096
+        }
+      ]
+    }
+  },
+  {
+    "name": "project_directory_bind",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "directory",
+          "kind": "text",
+          "required": true,
+          "allowEmpty": false,
+          "maxBytes": 4096
+        }
+      ]
+    }
+  },
+  {
+    "name": "project_directory_read",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "path",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 4096
+        }
+      ]
+    }
+  },
+  {
+    "name": "project_directory_clear",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "shell_execute",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "commands",
+          "kind": "texts",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 523264
+        },
+        {
+          "name": "onError",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 8,
+          "choices": ["stop", "continue"]
+        },
+        {
+          "name": "cwd",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 4096
+        },
+        {
+          "name": "mode",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 10,
+          "choices": ["foreground", "background"]
+        },
+        {
+          "name": "yieldSeconds",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 2147483
+        }
+      ]
+    }
+  },
+  {
+    "name": "shell_job_control",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "action",
+          "kind": "text",
+          "required": true,
+          "allowEmpty": false,
+          "maxBytes": 6,
+          "choices": ["list", "status", "wait", "cancel", "output"]
+        },
+        {
+          "name": "jobIds",
+          "kind": "texts",
+          "required": false,
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 36
+        },
+        {
+          "name": "waitMode",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 3,
+          "choices": ["all", "any"]
+        },
+        {
+          "name": "waitSeconds",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 30
+        },
+        {
+          "name": "offset",
+          "kind": "integer",
+          "required": false,
+          "minimum": 0,
+          "maximum": 9007199254740927
+        }
+      ]
+    }
+  },
+  {
+    "name": "machine_docker_inspect",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "containerIds",
+          "kind": "texts",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 64
+        }
+      ]
+    }
+  },
+  {
+    "name": "machine_docker_control",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "items",
+          "kind": "objects",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "fields": [
+            {
+              "name": "containerId",
+              "kind": "text",
+              "required": true,
+              "allowEmpty": false,
+              "maxBytes": 64
+            },
+            {
+              "name": "action",
+              "kind": "text",
+              "required": true,
+              "allowEmpty": false,
+              "maxBytes": 7,
+              "choices": ["start", "stop", "restart", "remove"]
+            },
+            {
+              "name": "expectedFingerprint",
+              "kind": "text",
+              "required": true,
+              "allowEmpty": false,
+              "maxBytes": 64
+            }
+          ]
+        },
+        {
+          "name": "onError",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 8,
+          "choices": ["stop", "continue"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_inspect",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "paths",
+          "kind": "texts",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 4096
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_patch",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "path",
+          "required": true,
+          "kind": "text",
+          "allowEmpty": false,
+          "maxBytes": 4096
+        },
+        {
+          "name": "expectedSha256",
+          "required": true,
+          "kind": "text",
+          "allowEmpty": false,
+          "maxBytes": 64
+        },
+        {
+          "name": "edits",
+          "required": true,
+          "kind": "objects",
+          "maxItems": 9007199254740991,
+          "fields": [
+            {
+              "name": "oldText",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 523264
+            },
+            {
+              "name": "newText",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": true,
+              "maxBytes": 523264
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_move",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "items",
+          "kind": "objects",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "fields": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 4096
+            },
+            {
+              "name": "destinationPath",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 4096
+            },
+            {
+              "name": "expectedFingerprint",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 64
+            }
+          ]
+        },
+        {
+          "name": "onError",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 8,
+          "choices": ["stop", "continue"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_delete",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "items",
+          "kind": "objects",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "fields": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 4096
+            },
+            {
+              "name": "expectedFingerprint",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 64
+            },
+            {
+              "name": "scope",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 5,
+              "choices": ["entry", "tree"]
+            }
+          ]
+        },
+        {
+          "name": "onError",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 8,
+          "choices": ["stop", "continue"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_write",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "items",
+          "kind": "objects",
+          "required": true,
+          "maxItems": 9007199254740991,
+          "fields": [
+            {
+              "name": "path",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 4096
+            },
+            {
+              "name": "content",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": true,
+              "maxBytes": 523264
+            },
+            {
+              "name": "expectedSha256",
+              "required": true,
+              "kind": "text",
+              "allowEmpty": false,
+              "maxBytes": 64
+            }
+          ]
+        },
+        {
+          "name": "onError",
+          "kind": "text",
+          "required": false,
+          "allowEmpty": false,
+          "maxBytes": 8,
+          "choices": ["stop", "continue"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "machine_connection_list",
+    "input": {
+      "fields": []
+    }
+  },
+  {
+    "name": "machine_diagnostics_read",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "file_search",
+    "input": {
+      "fields": [
+        {
+          "name": "connectionId",
+          "required": true,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        {
+          "name": "path",
+          "required": true,
+          "kind": "text",
+          "allowEmpty": false,
+          "maxBytes": 4096
+        },
+        {
+          "name": "queries",
+          "required": true,
+          "kind": "texts",
+          "maxItems": 9007199254740991,
+          "maxItemBytes": 523264
+        },
+        {
+          "name": "maxResults",
+          "required": false,
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      ]
+    }
+  }
+]

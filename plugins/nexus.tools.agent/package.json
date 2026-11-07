@@ -1,0 +1,13 @@
+{
+  "name": "@nexus-plugins/tools-agent",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test src/algorithms.test.mjs"
+  },
+  "dependencies": {
+    "fuse.js": "^7.5.0"
+  }
+}

@@ -167,7 +167,21 @@ const functionSpacingPlugin = {
 };
 
 export default [
-	{ ignores: ['**/node_modules/**', '.dist/**'] },
+	{
+		ignores: [
+			'**/node_modules/**',
+			'.dist/**',
+			'templates/*/backend/**',
+			'sdk/*.mjs',
+			'plugins/nexus.agent/frontend/**',
+			'plugins/nexus.ui.chat/frontend/**',
+			'plugins/nexus.ui.chat/dist/**',
+			'plugins/nexus.agent/backend/**',
+			'plugins/nexus.tools.*/backend/**',
+			'plugins/nexus.services.*/backend/**',
+			'plugins/nexus.services.*/frontend/**',
+		],
+	},
 	{
 		files: ['**/*.mjs'],
 		plugins: { 'nexus-style': functionSpacingPlugin },

@@ -1,0 +1,47 @@
+name: Aggregate catalog
+on:
+  workflow_dispatch:
+    inputs:
+      release_descriptors:
+        description: JSON array of HTTPS URLs of already published package.release.json assets
+        required: true
+      release_tag:
+        description: Existing draft catalog release tag
+        required: true
+      base_catalogs:
+        description: JSON array of existing public catalog URLs whose package versions must remain available
+        required: false
+        default: '[]'
+      recommended_apps:
+        description: JSON array of App package IDs whose newest published version must resolve completely
+        required: true
+        default: '["nexus.agent"]'
+concurrency:
+  group: plugin-catalog-${{ inputs.release_tag }}
+  cancel-in-progress: false
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 'current'
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Download and aggregate original signed artifacts
+        env:
+          RELEASE_DESCRIPTORS: ${{ inputs.release_descriptors }}
+          BASE_CATALOGS: ${{ inputs.base_catalogs }}
+          RECOMMENDED_APPS: ${{ inputs.recommended_apps }}
+        run: node scripts/download-catalog.mjs "$RELEASE_DESCRIPTORS" .dist "$BASE_CATALOGS" "$RECOMMENDED_APPS"
+      - name: Upload catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          test "$(gh release view --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' -- "$RELEASE_TAG")" = true
+          gh release upload --repo "$GITHUB_REPOSITORY" -- "$RELEASE_TAG" .dist/catalog.json

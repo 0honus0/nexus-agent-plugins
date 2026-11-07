@@ -3,3 +3,12 @@
 *.pem
 .DS_Store
 node_modules/
+plugins/nexus.ui.chat/dist/
+plugins/nexus.ui.chat/frontend/
+plugins/nexus.ui.chat/SOURCE-MANIFEST.json
+plugins/nexus.agent/backend/
+plugins/nexus.tools.*/backend/
+plugins/nexus.services.*/backend/
+plugins/nexus.services.*/frontend/
+
+templates/*/backend/

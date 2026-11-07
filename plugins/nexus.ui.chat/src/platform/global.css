@@ -1,0 +1,4 @@
+@import '../app/styles/global.css';
+
+/* All UI components are maintained and scanned inside this plugin. */
+@source '../';

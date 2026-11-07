@@ -1,0 +1,11 @@
+packages:
+  - 'plugins/nexus.agent'
+  - 'plugins/nexus.tools.*'
+  - 'plugins/nexus.services.*'
+  - 'plugins/nexus.ui.chat'
+
+allowBuilds:
+  esbuild@0.28.2: true
+
+overrides:
+  '@nexus-terminal/shared': 'file:sdk/nexus-terminal-shared-4.0.1.tgz'
