@@ -1,9 +1,36 @@
-import { Client, StreamableHTTPClientTransport, isInputRequiredResult } from '@modelcontextprotocol/client';
+import {
+	Client,
+	StreamableHTTPClientTransport,
+	isInputRequiredResult,
+	specTypeSchemas,
+} from '@modelcontextprotocol/client';
 import { ServiceFailure, encoded, objectJson, text, collectFailures } from '../../../lib/services/failure.mjs';
 
 const REQUEST_TIMER_MAX_MS = 2 ** 31 - 1;
 
 export const MCP_SYNTHETIC_URL = 'https://nexus-managed.invalid/mcp';
+
+/** Manual SDK mode does not validate embedded requests before returning them. */
+function inputRequests(result) {
+	const schemas = new Map([
+		['elicitation/create', specTypeSchemas.ElicitRequest],
+		['sampling/createMessage', specTypeSchemas.CreateMessageRequest],
+		['roots/list', specTypeSchemas.ListRootsRequest],
+	]);
+	const requests = {};
+	for (const [id, request] of Object.entries(result.inputRequests)) {
+		const schema = request !== null && typeof request === 'object' ? schemas.get(request.method) : undefined;
+		if (schema === undefined) {
+			throw new ServiceFailure('invalid_input');
+		}
+		const parsed = schema['~standard'].validate(request);
+		if (parsed.issues !== undefined) {
+			throw new ServiceFailure('invalid_input');
+		}
+		Object.defineProperty(requests, id, { value: parsed.value, enumerable: true });
+	}
+	return requests;
+}
 
 function catalog(client, tools, resources, prompts) {
 	if (
@@ -144,7 +171,7 @@ export class McpProtocolSession {
 			return {
 				kind: 'input_required',
 				requestState: result.requestState ?? null,
-				inputRequestsJson: encoded(result.inputRequests),
+				inputRequestsJson: encoded(inputRequests(result)),
 			};
 		}
 		return { kind: 'complete', resultJson: encoded(result) };

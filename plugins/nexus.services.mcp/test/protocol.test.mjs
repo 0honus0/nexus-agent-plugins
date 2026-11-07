@@ -274,3 +274,66 @@ await test(
 		}
 	},
 );
+
+await test('MCP manual continuations validate embedded requests with official schemas before exposing them', async (t) => {
+	const malformed = [
+		null,
+		[],
+		'request',
+		{},
+		{ method: 'tools/call', params: {} },
+		{ method: 'elicitation/create' },
+		{ method: 'sampling/createMessage' },
+		{ method: 'roots/list', params: null },
+		{ method: 'roots/list', params: [] },
+		{ method: 'elicitation/create', params: 'payload' },
+		{ method: 'sampling/createMessage', params: 12 },
+	];
+	for (const request of malformed) {
+		await t.test(JSON.stringify(request), async () => {
+			const server = endpoint(() => ({
+				resultType: 'input_required',
+				requestState: 'pending',
+				inputRequests: { bad: request },
+			}));
+			const session = new McpProtocolSession({
+				protocolVersion: '2026-07-28',
+				client: { name: 'test', version: '1' },
+			});
+			const signal = new AbortController().signal;
+			try {
+				await session.attach(server.fetch, signal);
+				await assert.rejects(
+					session.invoke({ kind: 'tool', name: 'echo', argumentsJson: '{}', resume: null }, signal),
+					(error) => error.code === 'invalid_input',
+				);
+			} finally {
+				await session.dispose();
+			}
+		});
+	}
+});
+
+await test('MCP preserves SDK normalization of absent request maps without executing external requests', async () => {
+	for (const inputRequests of [undefined, null, [], 'text', 1]) {
+		const server = endpoint(() => ({ resultType: 'input_required', requestState: 'opaque', inputRequests }));
+		const session = new McpProtocolSession({
+			protocolVersion: '2026-07-28',
+			client: { name: 'test', version: '1' },
+		});
+		const signal = new AbortController().signal;
+		try {
+			await session.attach(server.fetch, signal);
+			const result = await session.invoke(
+				{ kind: 'tool', name: 'echo', argumentsJson: '{}', resume: null },
+				signal,
+			);
+			assert.equal(result.kind, 'input_required');
+			assert.equal(result.inputRequestsJson, '{}');
+			assert.equal(result.requestState, 'opaque');
+			assert.equal(server.calls.filter((call) => call.method === 'tools/call').length, 1);
+		} finally {
+			await session.dispose();
+		}
+	}
+});
