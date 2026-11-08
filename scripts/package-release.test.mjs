@@ -67,6 +67,30 @@ test('third-party template uses the shared contract, V4 signature, immutable rel
 			'Independent publishers keep their original catalog text',
 		);
 		assert.deepEqual(fs.readFileSync(first.packagePath), original);
+		const localized = JSON.parse(fs.readFileSync(first.releasePath, 'utf8'));
+		localized.package.description = 'Editable catalog description';
+		localized.package.localizations = [
+			{ locale: 'zh-CN', displayName: '第三方插件', description: '独立发布者的说明' },
+		];
+		const inheritedPath = path.join(temp, 'inherited.release.json');
+		fs.writeFileSync(inheritedPath, JSON.stringify(localized));
+		for (let generation = 0; generation < 2; generation++) {
+			const aggregatedPath = path.join(temp, `localized-${generation}.json`);
+			run('build-catalog-release.mjs', aggregatedPath, inheritedPath);
+			const aggregated = JSON.parse(fs.readFileSync(aggregatedPath, 'utf8')).packages[0];
+			assert.equal(aggregated.sha256, sha256(original));
+			assert.equal(aggregated.description, localized.package.description);
+			assert.deepEqual(aggregated.localizations, localized.package.localizations);
+			fs.writeFileSync(
+				inheritedPath,
+				JSON.stringify({
+					schemaVersion: localized.schemaVersion,
+					publisher: localized.publisher,
+					package: aggregated,
+					archiveName: localized.archiveName,
+				}),
+			);
+		}
 		const tampered = JSON.parse(fs.readFileSync(second.releasePath, 'utf8'));
 		tampered.package.compatibility.host.minVersion = '1.0.0';
 		fs.writeFileSync(second.releasePath, JSON.stringify(tampered));

@@ -270,6 +270,20 @@ export function readReleaseDescriptor(metadata) {
 	return { schemaVersion: 2, publisher, package: artifact, archiveName: metadata.archiveName };
 }
 
+// Catalog presentation can be localized independently; executable identity remains archive-derived.
+function releaseIdentity(entry) {
+	return {
+		packageId: entry.packageId,
+		version: entry.version,
+		compatibility: entry.compatibility,
+		contributionKinds: entry.contributionKinds,
+		packageUrl: entry.packageUrl,
+		sha256: entry.sha256,
+		sizeBytes: entry.sizeBytes,
+		publisherKeyId: entry.publisherKeyId,
+	};
+}
+
 /** A descriptor is accepted only together with the original signed archive it describes. */
 export function readReleaseArtifact(releasePath) {
 	const bytes = fs.readFileSync(releasePath);
@@ -288,12 +302,36 @@ export function readReleaseArtifact(releasePath) {
 		inspected.sizeBytes,
 		artifact.packageUrl,
 	);
-	if (JSON.stringify(artifact) !== JSON.stringify(expected) || publisher.keyId !== inspected.publisher.keyId) {
+	if (
+		JSON.stringify(releaseIdentity(artifact)) !== JSON.stringify(releaseIdentity(expected)) ||
+		publisher.keyId !== inspected.publisher.keyId
+	) {
 		throw new Error('PLUGIN_RELEASE_METADATA_MISMATCH');
 	}
 	return {
 		archivePath,
 		manifest: inspected.manifest,
-		release: { schemaVersion: 2, publisher, package: expected, archiveName: release.archiveName },
+		release: {
+			schemaVersion: 2,
+			publisher,
+			package: {
+				packageId: expected.packageId,
+				version: expected.version,
+				compatibility: expected.compatibility,
+				contributionKinds: expected.contributionKinds,
+				displayName: artifact.displayName,
+				description: artifact.description,
+				localizations: artifact.localizations?.map((item) => ({
+					locale: item.locale,
+					displayName: item.displayName,
+					description: item.description,
+				})),
+				packageUrl: expected.packageUrl,
+				sha256: expected.sha256,
+				sizeBytes: expected.sizeBytes,
+				publisherKeyId: expected.publisherKeyId,
+			},
+			archiveName: release.archiveName,
+		},
 	};
 }
