@@ -24,7 +24,7 @@
     "build:services": "node plugins/nexus.services.mcp/build.mjs && node plugins/nexus.services.acp/build.mjs",
     "build:templates": "node scripts/build-templates.mjs",
     "test:services": "node --test plugins/nexus.services.mcp/test/*.test.mjs plugins/nexus.services.acp/test/*.test.mjs",
-    "test:repository": "node --test scripts/composition.test.mjs scripts/package-release.test.mjs",
+    "test:repository": "node --test scripts/composition.test.mjs scripts/package-release.test.mjs scripts/release-download.test.mjs",
     "test:plugins": "pnpm --recursive --workspace-concurrency=1 --filter './plugins/**' run test"
   },
   "devDependencies": {

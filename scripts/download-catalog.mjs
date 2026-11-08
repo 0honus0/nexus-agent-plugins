@@ -10,33 +10,7 @@ import {
 import { writeImmutable, readReleaseDescriptor } from './lib/package-artifact.mjs';
 import { readAgentPluginCatalogIndex } from '@nexus-terminal/shared/agent/plugins/repository-http-codec';
 
-async function readBytes(response, limit) {
-	if (response.body === null) {
-		throw new Error('PLUGIN_RELEASE_DOWNLOAD_FAILED');
-	}
-	const chunks = [];
-	let size = 0;
-	for await (const chunk of response.body) {
-		size += chunk.byteLength;
-		if (size > limit) {
-			throw new Error('PLUGIN_RELEASE_DOWNLOAD_TOO_LARGE');
-		}
-		chunks.push(chunk);
-	}
-	return Buffer.concat(chunks, size);
-}
-
-async function download(url, limit) {
-	const source = new URL(url);
-	if (source.protocol !== 'https:') {
-		throw new Error('PLUGIN_RELEASE_URL_INVALID');
-	}
-	const response = await fetch(source);
-	if (!response.ok) {
-		throw new Error('PLUGIN_RELEASE_DOWNLOAD_FAILED');
-	}
-	return readBytes(response, limit);
-}
+import { downloadReleaseBytes as download } from './lib/release-download.mjs';
 
 const [urlsArg, outputArg, basesArg = '[]', requiredAppsArg = '[]'] = process.argv.slice(2);
 const urls = JSON.parse(urlsArg);
