@@ -1,6 +1,6 @@
 # Browser tools
 
-This SDK 2 package contributes sixteen model tools. Its signed manifest owns the model descriptions, input schemas,
+This SDK 4 package contributes sixteen model tools. Its signed manifest owns the model descriptions, input schemas,
 discovery metadata and exact Host operation allowlists. Local inputs validate model arguments and materialize defaults;
 `src/operations.mjs` converts each tool into a fixed, typed `browser.*` domain operation and projects its model result.
 
@@ -24,3 +24,5 @@ cancellation and model validation. It also runs the package entry with the publi
 that malformed Host replies and mismatched operations are rejected. It uses synthetic typed Host responses and does not
 establish real browser or approval behavior. `backend/index.mjs` is a bundled build artifact containing only this package
 and its published SDK dependencies.
+
+CDP targets are configured per plugin instance using the installed package’s Settings button. The settings page follows the Host language and theme; only administrators can change endpoint trust and URL allowlists. Saving retires the exact instance’s existing sessions.

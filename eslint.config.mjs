@@ -178,6 +178,7 @@ export default [
 			'plugins/nexus.ui.chat/dist/**',
 			'plugins/nexus.agent/backend/**',
 			'plugins/nexus.tools.*/backend/**',
+			'plugins/nexus.tools.*/frontend/**',
 			'plugins/nexus.services.*/backend/**',
 			'plugins/nexus.services.*/frontend/**',
 		],

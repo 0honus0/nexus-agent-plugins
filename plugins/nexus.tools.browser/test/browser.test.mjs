@@ -254,3 +254,30 @@ test('The package runtime rejects malformed Host replies and preserves typed ref
 	}
 	assert.equal(calls, 3);
 });
+
+test('Browser instance settings use strict targets and reserve trust changes for administrators', async () => {
+	const { readAgentBrowserPluginConfiguration } =
+		await import('@nexus-terminal/shared/agent/integrations/browser-codec');
+	const manifest = readAgentPluginManifest(
+		JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8')),
+	);
+	assert.equal(manifest.compatibility.frontendSdk, 4);
+	const settings = manifest.contributions.settings;
+	assert.equal(settings.frontendEntry, 'frontend/index.html');
+	assert.deepEqual(settings.agentEditablePaths, []);
+	assert.deepEqual(readAgentBrowserPluginConfiguration(JSON.parse(settings.defaultsJson)), { targets: [] });
+	const target = {
+		id: 'review',
+		endpoints: [{ url: 'wss://browser.example/cdp', priority: 800, allowPlaintext: false, verifyTls: true }],
+		allowedUrlPatterns: ['https://allowed.example/*'],
+	};
+	assert.deepEqual(readAgentBrowserPluginConfiguration({ targets: [target] }), { targets: [target] });
+	for (const document of [
+		{ targets: [target, target] },
+		{ targets: [{ ...target, endpoints: [{ ...target.endpoints[0], url: 'ws://browser.example/cdp' }] }] },
+		{ targets: [{ ...target, allowedUrlPatterns: ['https://*.example/*'] }] },
+		{ targets: [], endpoint: 'wss://untrusted.example/' },
+	]) {
+		assert.throws(() => readAgentBrowserPluginConfiguration(document));
+	}
+});

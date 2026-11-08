@@ -8,4 +8,4 @@ allowBuilds:
   esbuild@0.28.2: true
 
 overrides:
-  '@nexus-terminal/shared': 'file:sdk/nexus-terminal-shared-4.0.2.tgz'
+  '@nexus-terminal/shared': 'file:sdk/nexus-terminal-shared-4.0.3.tgz'

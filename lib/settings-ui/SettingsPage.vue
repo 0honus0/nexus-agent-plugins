@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends object">
 	import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 	import { connectNexusPlugin } from 'nexus:frontend-sdk';
 	import type { AgentPluginFrontendSdk } from '@nexus-terminal/shared/agent/plugins/frontend-sdk';
@@ -9,8 +9,8 @@
 	import type { AgentPluginUiEnvironment } from '@nexus-terminal/shared/agent/plugins/ui-events';
 	import { UiButton, UiInlineNotice, UiLoadingState } from './foundation/ui';
 
-	const props = defineProps<{ decode(documentJson: string): Record<string, string> }>();
-	const draft = ref<Record<string, string>>({});
+	const props = defineProps<{ decode(documentJson: string): T }>();
+	const draft = shallowRef<T | null>(null);
 	const source = shallowRef<AgentPluginInstanceSettings | null>(null);
 	const locale = ref('en-US');
 	const loading = ref(true);
@@ -91,7 +91,7 @@
 
 	async function save(): Promise<void> {
 		const current = source.value;
-		if (!sdk || !current?.settings || busy.value) {
+		if (!sdk || !current?.settings || !draft.value || busy.value) {
 			return;
 		}
 		let command = pending.value;
@@ -179,8 +179,13 @@
 		<template v-else>
 			<UiInlineNotice v-if="failure" compact tone="warning">{{ labels.failed }}</UiInlineNotice>
 			<UiInlineNotice v-else-if="saved" compact tone="success">{{ labels.saved }}</UiInlineNotice>
-			<fieldset v-if="source" :disabled="busy || pending !== null" class="space-y-5">
-				<slot :draft="draft" :locale="locale" :disabled="busy || pending !== null" />
+			<fieldset v-if="source && draft" :disabled="busy || pending !== null" class="space-y-5">
+				<slot
+					:draft="draft"
+					:update-draft="(value: T) => (draft = value)"
+					:locale="locale"
+					:disabled="busy || pending !== null"
+				/>
 			</fieldset>
 			<div class="flex justify-end gap-2">
 				<UiButton v-if="!pending" type="button" :disabled="busy" @click="load">{{ labels.reload }}</UiButton>

@@ -1,0 +1,138 @@
+{
+  "nexus.agent": [
+    {
+      "locale": "en-US",
+      "displayName": "Nexus Agent",
+      "description": "Model-driven chat and task execution with tools, reasoning effort, and context management."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Nexus Agent",
+      "description": "模型驱动的聊天与任务执行，支持工具、思考等级和上下文管理。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Nexus Agent",
+      "description": "ツール、推論レベル、コンテキスト管理に対応したチャットとタスク実行。"
+    }
+  ],
+  "nexus.ui.chat": [
+    {
+      "locale": "en-US",
+      "displayName": "Chat UI",
+      "description": "Agent chat interface with file previews, tool status, and approvals."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Chat UI",
+      "description": "Agent 聊天界面，支持文件预览、工具状态和审批操作。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Chat UI",
+      "description": "ファイルプレビュー、ツール状態、承認操作に対応したチャット画面。"
+    }
+  ],
+  "nexus.tools.browser": [
+    {
+      "locale": "en-US",
+      "displayName": "Browser Tools",
+      "description": "Browser automation over CDP, with page snapshots, interactions, screenshots, and per-instance targets."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Browser Tools",
+      "description": "通过 CDP 操作浏览器，支持页面快照、交互和截图；在插件设置中管理目标。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Browser Tools",
+      "description": "CDP によるブラウザー操作、ページスナップショット、スクリーンショット、接続先設定。"
+    }
+  ],
+  "nexus.tools.remote": [
+    {
+      "locale": "en-US",
+      "displayName": "Remote Tools",
+      "description": "SSH commands, remote files, terminals, and server management tools."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Remote Tools",
+      "description": "SSH 命令、远程文件、终端与服务器管理工具。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Remote Tools",
+      "description": "SSH コマンド、リモートファイル、ターミナル、サーバー管理ツール。"
+    }
+  ],
+  "nexus.tools.integrations": [
+    {
+      "locale": "en-US",
+      "displayName": "Integration Tools",
+      "description": "Discover and invoke capabilities from selected MCP and ACP services."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Integration Tools",
+      "description": "发现并调用已选择的 MCP 与 ACP 服务能力。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Integration Tools",
+      "description": "選択した MCP・ACP サービスの機能を検索して呼び出します。"
+    }
+  ],
+  "nexus.tools.agent": [
+    {
+      "locale": "en-US",
+      "displayName": "Agent Tools",
+      "description": "Subtask collaboration, skill discovery, memory, and Agent utilities."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "Agent Tools",
+      "description": "子任务协作、技能检索、记忆与 Agent 辅助工具。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "Agent Tools",
+      "description": "サブタスク連携、スキル検索、メモリー、Agent 補助ツール。"
+    }
+  ],
+  "nexus.services.mcp": [
+    {
+      "locale": "en-US",
+      "displayName": "MCP Service",
+      "description": "Connect MCP servers and provide standard tools and resources to apps."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "MCP Service",
+      "description": "连接 MCP 服务，为应用提供标准工具与资源能力。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "MCP Service",
+      "description": "MCP サーバーに接続し、標準ツールとリソースをアプリに提供します。"
+    }
+  ],
+  "nexus.services.acp": [
+    {
+      "locale": "en-US",
+      "displayName": "ACP Service",
+      "description": "Connect external ACP agents with sessions, tasks, and approval interactions."
+    },
+    {
+      "locale": "zh-CN",
+      "displayName": "ACP Service",
+      "description": "连接外部 ACP Agent，提供会话、任务与审批交互。"
+    },
+    {
+      "locale": "ja-JP",
+      "displayName": "ACP Service",
+      "description": "外部 ACP Agent に接続し、セッション、タスク、承認操作を提供します。"
+    }
+  ]
+}

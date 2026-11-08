@@ -1,3 +1,4 @@
+import { build as buildFrontend } from 'vite';
 import { build } from 'esbuild';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,3 +13,5 @@ await build({
 	target: 'node26',
 	legalComments: 'none',
 });
+
+await buildFrontend({ configFile: path.join(root, 'src/settings/vite.config.ts') });

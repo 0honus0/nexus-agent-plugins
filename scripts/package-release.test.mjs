@@ -1,3 +1,4 @@
+import * as sharedCatalogCodec from '@nexus-terminal/shared/agent/plugins/repository-http-codec';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
@@ -60,6 +61,11 @@ test('third-party template uses the shared contract, V4 signature, immutable rel
 		assert.equal(catalog.schemaVersion, 2);
 		assert.equal(catalog.packages.length, 2);
 		assert.equal(catalog.packages[0].sha256, sha256(original));
+		assert.equal(
+			catalog.packages[0].localizations,
+			undefined,
+			'Independent publishers keep their original catalog text',
+		);
 		assert.deepEqual(fs.readFileSync(first.packagePath), original);
 		const tampered = JSON.parse(fs.readFileSync(second.releasePath, 'utf8'));
 		tampered.package.compatibility.host.minVersion = '1.0.0';
@@ -483,5 +489,33 @@ test('development loopback package URLs require an explicit option and keep orig
 		);
 	} finally {
 		fs.rmSync(temp, { recursive: true, force: true });
+	}
+});
+
+test('Official catalog metadata has valid locale translations for every published plugin', () => {
+	const { readAgentPluginCatalogPackage } = sharedCatalogCodec;
+	const translations = JSON.parse(fs.readFileSync(path.join(root, 'catalog/localizations.json'), 'utf8'));
+	for (const directory of fs.readdirSync(path.join(root, 'plugins'))) {
+		const manifest = JSON.parse(fs.readFileSync(path.join(root, 'plugins', directory, 'manifest.json'), 'utf8'));
+		const entry = readAgentPluginCatalogPackage({
+			packageId: manifest.id,
+			version: manifest.version,
+			compatibility: manifest.compatibility,
+			contributionKinds: ['tools'],
+			displayName: manifest.displayName,
+			description: 'Fallback',
+			localizations: translations[manifest.id],
+			packageUrl: 'https://example.test/package.tar',
+			sha256: 'a'.repeat(64),
+			sizeBytes: 1024,
+			publisherKeyId: 'ed25519:' + 'b'.repeat(64),
+		});
+		assert.deepEqual(
+			entry.localizations.map((item) => item.locale),
+			['en-US', 'zh-CN', 'ja-JP'],
+		);
+		for (const item of entry.localizations) {
+			assert.ok(item.displayName && item.description);
+		}
 	}
 });

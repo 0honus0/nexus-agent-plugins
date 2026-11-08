@@ -175,7 +175,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@nexus-terminal/shared': file:sdk/nexus-terminal-shared-4.0.2.tgz
+  '@nexus-terminal/shared': file:sdk/nexus-terminal-shared-4.0.3.tgz
 
 importers:
   .:
@@ -184,8 +184,8 @@ importers:
         specifier: 7.3.1
         version: 7.3.1
       '@nexus-terminal/shared':
-        specifier: file:sdk/nexus-terminal-shared-4.0.2.tgz
-        version: file:sdk/nexus-terminal-shared-4.0.2.tgz
+        specifier: file:sdk/nexus-terminal-shared-4.0.3.tgz
+        version: file:sdk/nexus-terminal-shared-4.0.3.tgz
       reka-ui:
         specifier: 2.11.0
         version: 2.11.0(vue@3.5.44(@typescript/typescript6@6.0.2))
@@ -339,8 +339,8 @@ importers:
         specifier: 7.3.1
         version: 7.3.1
       '@nexus-terminal/shared':
-        specifier: file:../../sdk/nexus-terminal-shared-4.0.2.tgz
-        version: file:sdk/nexus-terminal-shared-4.0.2.tgz
+        specifier: file:../../sdk/nexus-terminal-shared-4.0.3.tgz
+        version: file:sdk/nexus-terminal-shared-4.0.3.tgz
       '@noble/hashes':
         specifier: 2.4.0
         version: 2.4.0
@@ -896,13 +896,13 @@ packages:
       { integrity: sha512-k+ph/D8H9GS8ZZ48okvHrKeJynkqAA1kMUZRuzRWNlQUDHXngq7oRaWMZBdmSfd9ZhVy9bwNKei/7wMboI/uMg== }
     engines: { node: '>= 10' }
 
-  '@nexus-terminal/shared@file:sdk/nexus-terminal-shared-4.0.2.tgz':
+  '@nexus-terminal/shared@file:sdk/nexus-terminal-shared-4.0.3.tgz':
     resolution:
       {
-        integrity: sha512-k1jO+zbepLw0J24cuy6Q24RVaolai+PUtiT5qvGv9DNy3FYftwyXNLEMkBZ48WjL8qIsncAiHQmR9Kx8o8BUzQ==,
-        tarball: file:sdk/nexus-terminal-shared-4.0.2.tgz,
+        integrity: sha512-C7bppOgRnvM+9FbhabE89TOXXPAVHekuhlctp3VlYAuRsAANV5zjbMwzXZQkfefsiSv61vSFqJ6YdFsbRHt5yg==,
+        tarball: file:sdk/nexus-terminal-shared-4.0.3.tgz,
       }
-    version: 4.0.2
+    version: 4.0.3
 
   '@noble/hashes@2.4.0':
     resolution:
@@ -2701,7 +2701,7 @@ snapshots:
       '@napi-rs/canvas-win32-x64-msvc': 1.1.0
     optional: true
 
-  '@nexus-terminal/shared@file:sdk/nexus-terminal-shared-4.0.2.tgz':
+  '@nexus-terminal/shared@file:sdk/nexus-terminal-shared-4.0.3.tgz':
     dependencies:
       semver: 7.8.6
       zod: 4.6.7

@@ -10,3 +10,5 @@ sdk/*.mjs
 plugins/nexus.agent/frontend/
 
 templates/*/backend/
+
+plugins/nexus.tools.*/frontend/

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { compare } from 'semver';
 import { inspectComposition } from './lib/composition.mjs';
@@ -24,6 +26,12 @@ if (!outputArg || !releaseArgs.length) {
 		'Usage: node scripts/build-catalog-release.mjs <catalog.json> <package.release.json>... [--require-app packageId]',
 	);
 }
+const localizations = JSON.parse(
+	fs.readFileSync(fileURLToPath(new URL('../catalog/localizations.json', import.meta.url)), 'utf8'),
+);
+const officialPublisher = JSON.parse(
+	fs.readFileSync(fileURLToPath(new URL('../catalog/official-publisher.json', import.meta.url)), 'utf8'),
+);
 const publishers = new Map();
 const packages = new Map();
 const candidates = [];
@@ -67,7 +75,23 @@ for (const packageId of requiredApps) {
 const index = readAgentPluginCatalogIndex({
 	schemaVersion: 2,
 	publishers: [...publishers.values()],
-	packages: [...packages.values()],
+	packages: [...packages.values()].map((entry) => {
+		const translations =
+			entry.publisherKeyId === officialPublisher.keyId ? localizations[entry.packageId] : undefined;
+		return {
+			packageId: entry.packageId,
+			version: entry.version,
+			compatibility: entry.compatibility,
+			contributionKinds: entry.contributionKinds,
+			displayName: entry.displayName,
+			description: translations?.find((item) => item.locale === 'en-US')?.description ?? entry.description,
+			localizations: translations ?? entry.localizations,
+			packageUrl: entry.packageUrl,
+			sha256: entry.sha256,
+			sizeBytes: entry.sizeBytes,
+			publisherKeyId: entry.publisherKeyId,
+		};
+	}),
 });
 writeImmutable(path.resolve(outputArg), Buffer.from(`${JSON.stringify(index, null, 2)}\n`));
 console.log(
