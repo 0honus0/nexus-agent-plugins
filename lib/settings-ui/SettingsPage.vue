@@ -179,7 +179,7 @@
 		<template v-else>
 			<UiInlineNotice v-if="failure" compact tone="warning">{{ labels.failed }}</UiInlineNotice>
 			<UiInlineNotice v-else-if="saved" compact tone="success">{{ labels.saved }}</UiInlineNotice>
-			<fieldset v-if="source && draft" :disabled="busy || pending !== null" class="space-y-5">
+			<fieldset v-if="source && draft" :disabled="busy || pending !== null" class="min-w-0 space-y-5">
 				<slot
 					:draft="draft"
 					:update-draft="(value: T) => (draft = value)"
