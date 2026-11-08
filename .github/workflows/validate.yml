@@ -4,6 +4,12 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      dependency_cache:
+        description: Quality job pnpm cache (runner image remains identical)
+        required: true
+        default: warm
+        type: choice
+        options: [warm, cold]
       host_run_id:
         description: Successful Nexus Terminal E2E run ID (empty selects latest successful main)
         required: false
@@ -17,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
+      runner-image: ${{ steps.runner.outputs.image }}
       host-sha: ${{ steps.host.outputs.sha }}
       host-run-id: ${{ steps.host.outputs.run-id }}
       host-artifact-id: ${{ steps.build.outputs.result }}
@@ -25,6 +32,7 @@ jobs:
       run:
         working-directory: plugins
     env:
+      NEXUS_TEST_METRICS: ${{ github.workspace }}/test-artifacts/metrics
       NEXUS_TEST_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts
       NEXUS_TEST_HOST_ROOT: ${{ github.workspace }}/host
       NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/candidates/staging-1
@@ -40,15 +48,18 @@ jobs:
         with:
           node-version: 'current'
           package-manager-cache: false
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: pnpm run check
+          cache: ${{ inputs.dependency_cache != 'cold' && 'pnpm' || '' }}
+          cache-dependency-path: plugins/pnpm-lock.yaml
+      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/install.json" pnpm install --frozen-lockfile
+      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/build.json" pnpm run build
+      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/check.json" pnpm run check
       - name: Run source logic tests
-        run: pnpm test:fast
+        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/fast.json" pnpm test:fast
       - name: Run package and repository tests
         run: |
           mkdir -p "$NEXUS_TEST_ARTIFACT_DIR"
-          node --test --test-reporter=spec --test-reporter=junit \
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/packages.json" \
+            node --test --test-reporter=spec --test-reporter=junit \
             --test-reporter-destination=stdout \
             --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/packages.xml" \
             'plugins/*/tests/**/*.native.test.mjs' 'tests/{repository,templates}/**/*.native.test.mjs'
@@ -94,7 +105,7 @@ jobs:
           package-manager-cache: false
       - name: Install Host protocol test dependencies
         working-directory: host
-        run: pnpm install --frozen-lockfile
+        run: bash ../plugins/scripts/measure-command.sh "$NEXUS_TEST_METRICS/host-install.json" pnpm install --frozen-lockfile
       - name: Resolve the immutable successful Host build
         id: build
         uses: actions/github-script@v9.0.0
@@ -122,9 +133,9 @@ jobs:
           HOST_SHA: ${{ steps.host.outputs.sha }}
         run: node scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
       - name: Sign exact plugin candidates once
-        run: pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
+        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/sign.json" pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
       - name: Check all browser sources and discovery
-        run: pnpm check:browser
+        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/browser-check.json" pnpm check:browser
       - name: Archive compiled plugins without rebuilding in shards
         run: tar --exclude=node_modules --exclude=.git -czf "$NEXUS_TEST_ARTIFACT_DIR/plugin-test-source.tar.gz" .
       - name: Upload one immutable plugin build and candidate set
@@ -137,12 +148,20 @@ jobs:
             test-artifacts/candidates/staging-1/
           if-no-files-found: error
           retention-days: 14
+      - name: Pin the immutable protocol runner image
+        id: runner
+        run: |
+          image=ghcr.io/0honus0/nexus-terminal-e2e-runner
+          digest="$(docker buildx imagetools inspect "$image:latest" --format '{{json .Manifest}}' | node --input-type=module -e 'let s=""; for await (const c of process.stdin) s+=c; const d=JSON.parse(s).digest; if (!/^sha256:[a-f0-9]{64}$/.test(d)) throw Error("Invalid image digest"); process.stdout.write(d)')"
+          echo "image=$image@$digest" >> "$GITHUB_OUTPUT"
+
       - name: Upload test reports and combinations
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
           name: plugin-quality-${{ github.sha }}-${{ github.run_attempt }}
           path: |
+            test-artifacts/metrics/*
             test-artifacts/*.xml
             test-artifacts/*combination*.json
             test-artifacts/reports/*
@@ -171,7 +190,7 @@ jobs:
       actions: read
       packages: read
     container:
-      image: ghcr.io/0honus0/nexus-terminal-e2e-runner:latest
+      image: ${{ needs.quality.outputs.runner-image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ github.token }}
@@ -240,20 +259,44 @@ jobs:
         id: interoperability
         run: |
           mkdir -p "$NEXUS_TEST_ARTIFACT_DIR/reports"
-          node --test --test-concurrency=1 --test-shard="${{ matrix.shard }}/8" \
+          bash scripts/measure-command.sh "$NEXUS_TEST_ARTIFACT_DIR/metrics/interop.json" \
+            node --test --test-concurrency=1 --test-shard="${{ matrix.shard }}/8" \
             --test-reporter=spec --test-reporter=junit \
             --test-reporter-destination=stdout \
             --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/reports/interoperability.xml" \
             'tests/interoperability/**/*.native.test.mjs'
       - name: Run plugin browser shard against the same candidates
         if: ${{ !cancelled() && steps.interoperability.outcome != 'skipped' }}
-        run: pnpm test:browser --shard "${{ matrix.shard }}/8"
+        run: bash scripts/measure-command.sh "$NEXUS_TEST_ARTIFACT_DIR/metrics/browser.json" pnpm test:browser --shard "${{ matrix.shard }}/8"
+      - name: Record shard resource environment
+        if: always()
+        env:
+          PINNED_RUNNER_IMAGE: ${{ needs.quality.outputs.runner-image }}
+          HOST_SHA: ${{ needs.quality.outputs.host-sha }}
+          DEPENDENCY_CACHE: ${{ inputs.dependency_cache || 'warm' }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import os from 'node:os';
+          const read = (path) => fs.existsSync(path) ? fs.readFileSync(path, 'utf8').trim() : null;
+          const root = process.env.NEXUS_TEST_ARTIFACT_DIR + '/metrics';
+          fs.mkdirSync(root, { recursive: true });
+          fs.writeFileSync(root + '/environment.json', JSON.stringify({
+            sha: process.env.GITHUB_SHA, hostSha: process.env.HOST_SHA,
+            runnerImage: process.env.PINNED_RUNNER_IMAGE, fingerprint: process.env.E2E_RUNNER_FINGERPRINT,
+            dependencyCache: process.env.DEPENDENCY_CACHE, node: process.version,
+            cpus: os.availableParallelism(), memoryBytes: os.totalmem(),
+            cgroupMemoryPeakBytes: read('/sys/fs/cgroup/memory.peak') ?? read('/sys/fs/cgroup/memory/memory.max_usage_in_bytes'),
+            cgroupMemoryLimitBytes: read('/sys/fs/cgroup/memory.max'), cgroupCpuMax: read('/sys/fs/cgroup/cpu.max'),
+          }, null, 2));
+          JS
       - name: Upload shard reports and combinations
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
           name: plugin-tests-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
+            test-artifacts/layers/metrics/*
             test-artifacts/layers/reports/*
             test-artifacts/layers/*combination*.json
             test-artifacts/layers/browser/report.json
