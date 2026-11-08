@@ -175,24 +175,38 @@
 							>{{ text.remove }}</UiButton
 						>
 					</div>
-					<div class="flex flex-wrap gap-x-4 gap-y-2">
-						<UiCheckbox
-							:model-value="endpoint.allowPlaintext"
-							:disabled="disabled"
-							@update:model-value="setEndpoint(index, position, 'allowPlaintext', $event)"
-							>{{ text.plaintext }}</UiCheckbox
-						>
-						<UiCheckbox
-							:model-value="endpoint.verifyTls"
-							:disabled="disabled"
-							@update:model-value="setEndpoint(index, position, 'verifyTls', $event)"
-							>{{ text.tls }}</UiCheckbox
-						>
+					<div class="space-y-2">
+						<div class="flex min-w-0 items-start gap-2">
+							<UiCheckbox
+								:id="`plaintext-${index}-${position}`"
+								class="shrink-0"
+								:aria-label="text.plaintext"
+								:model-value="endpoint.allowPlaintext"
+								:disabled="disabled"
+								@update:model-value="setEndpoint(index, position, 'allowPlaintext', $event)"
+							/>
+							<label :for="`plaintext-${index}-${position}`" class="min-w-0 text-xs leading-6">{{
+								text.plaintext
+							}}</label>
+						</div>
+						<div class="flex min-w-0 items-start gap-2">
+							<UiCheckbox
+								:id="`tls-${index}-${position}`"
+								class="shrink-0"
+								:aria-label="text.tls"
+								:model-value="endpoint.verifyTls"
+								:disabled="disabled"
+								@update:model-value="setEndpoint(index, position, 'verifyTls', $event)"
+							/>
+							<label :for="`tls-${index}-${position}`" class="min-w-0 text-xs leading-6">{{
+								text.tls
+							}}</label>
+						</div>
 					</div>
 				</div>
 			</template>
 			<UiButton type="button" :disabled="disabled" @click="addEndpoint(index)">{{ text.addEndpoint }}</UiButton>
-			<UiFormField :label="text.patterns" :for-id="`patterns-${index}`" :hint="text.hint">
+			<UiFormField :label="text.patterns" :for-id="`patterns-${index}`" :description="text.hint">
 				<UiTextarea
 					:id="`patterns-${index}`"
 					:rows="3"
