@@ -68,8 +68,12 @@ export async function searchSkills(input, call, signal) {
 	return { matches };
 }
 
-/** Relevance is package policy; published/expiry/source access and hard limits remain Host facts. */
-export async function recallMemories(input, call, signal) {
+function selectionReplyBytes(items) {
+	return agentPluginCapabilityReplyBytes({ operation: 'memory.retrieve', value: { action: 'select', items } });
+}
+
+/** Ranking and totals are instance policy; Host revalidates authorization and every selected version. */
+export async function recallMemories(input, call, signal, configuration) {
 	const terms = [...new Set(input.query.toLowerCase().split(/\s+/u).filter(Boolean))];
 	const ranked = [];
 	const catalog = await candidates(
@@ -99,6 +103,7 @@ export async function recallMemories(input, call, signal) {
 						confidence: memory.confidence,
 						score,
 						bytes: Buffer.byteLength(JSON.stringify(value), 'utf8'),
+						wireBytes: selectionReplyBytes([value]) - selectionReplyBytes([]),
 					});
 				}
 			}
@@ -107,31 +112,69 @@ export async function recallMemories(input, call, signal) {
 	ranked.sort((a, b) => b.score - a.score || b.confidence - a.confidence || a.id.localeCompare(b.id));
 	const references = [];
 	let bytes = 2;
-	for (const memory of ranked.slice(0, catalog.limits.maxItems)) {
-		if (bytes + memory.bytes + 1 > catalog.limits.maxBytes) {
+	for (const memory of ranked.slice(0, Math.min(input.limit, configuration.maxRecallItems))) {
+		const nextBytes = bytes + memory.bytes + (references.length ? 1 : 0);
+		if (nextBytes > configuration.maxRecallBytes) {
 			break;
 		}
-		references.push({ id: memory.id, version: memory.version, score: memory.score });
-		bytes += memory.bytes + 1;
+		references.push(memory);
+		bytes = nextBytes;
 	}
-	const selected = await call({
-		operation: 'memory.retrieve',
-		action: 'select',
-		limit: input.limit,
-		candidatesSha256: catalog.snapshot,
-		items: references,
-	});
-	if (selected.action !== 'select') {
-		throw new Error('HOST_MEMORY_SELECTION_MISMATCH');
+	// A transport frame is a page, never the total recall quota. Keep each revalidation within it.
+	const batches = [];
+	let batch = [];
+	let wireBytes = selectionReplyBytes([]);
+	for (const memory of references) {
+		if (wireBytes + memory.wireBytes + (batch.length ? 1 : 0) > catalog.limits.maxBytes) {
+			if (!batch.length) {
+				throw new Error('HOST_MEMORY_SELECTION_TOO_LARGE');
+			}
+			batches.push(batch);
+			batch = [];
+			wireBytes = selectionReplyBytes([]);
+		}
+		if (wireBytes + memory.wireBytes > catalog.limits.maxBytes) {
+			throw new Error('HOST_MEMORY_SELECTION_TOO_LARGE');
+		}
+		wireBytes += memory.wireBytes + (batch.length ? 1 : 0);
+		batch.push({ id: memory.id, version: memory.version, score: memory.score });
 	}
-	return {
-		items: selected.items.map((memory) => ({
-			id: memory.id,
-			version: memory.version,
-			content: memory.content,
-			confidence: memory.confidence,
-			score: memory.score,
-		})),
-		untrusted: true,
-	};
+	if (batch.length || !batches.length) {
+		batches.push(batch);
+	}
+	const items = [];
+	for (const references of batches) {
+		signal.throwIfAborted();
+		const selected = await call({
+			operation: 'memory.retrieve',
+			action: 'select',
+			limit: input.limit,
+			candidatesSha256: catalog.snapshot,
+			items: references,
+		});
+		signal.throwIfAborted();
+		if (
+			selected.action !== 'select' ||
+			selected.items.length !== references.length ||
+			selectionReplyBytes(selected.items) > catalog.limits.maxBytes ||
+			selected.items.some(
+				(memory, index) =>
+					memory.id !== references[index].id ||
+					memory.version !== references[index].version ||
+					memory.score !== references[index].score,
+			)
+		) {
+			throw new Error('HOST_MEMORY_SELECTION_MISMATCH');
+		}
+		for (const memory of selected.items) {
+			items.push({
+				id: memory.id,
+				version: memory.version,
+				content: memory.content,
+				confidence: memory.confidence,
+				score: memory.score,
+			});
+		}
+	}
+	return { items, untrusted: true };
 }

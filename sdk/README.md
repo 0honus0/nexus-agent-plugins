@@ -1,6 +1,6 @@
 # Public SDK distribution
 
-This SDK4 release pins `nexus-terminal-shared-4.0.1.tgz`, `backend-v4.mjs` and the Host-served `/sdk/frontend-v4.mjs`. Shared owns public contracts and strict codecs; backend/frontend adapters expose only scoped protocol capabilities. Earlier SDK archives remain immutable historical inputs and are not runtime fallbacks. The workspace override, consumer dependencies and lockfile must select the same archive; changing only a dependency does not override pnpm's workspace policy.
+This SDK4 release pins `nexus-terminal-shared-4.0.4.tgz`, `backend-v4.mjs` and the Host-served `/sdk/frontend-v4.mjs`. Shared owns public contracts and strict codecs; backend/frontend adapters expose only scoped protocol capabilities. Earlier SDK archives remain immutable historical inputs and are not runtime fallbacks. The workspace override, consumer dependencies and lockfile must select the same archive; changing only a dependency does not override pnpm's workspace policy.
 
 The backend asset is built from `packages/backend/src/modules/agent/plugins/sdk/index.ts` by its public SDK build. The frontend asset is built from `packages/frontend/src/features/agent/plugins/sdk/index.ts`. Plugin builds bundle the pinned backend adapter and keep `nexus:frontend-sdk` external. No Host private import, source copy or runtime npm installation is required.
 

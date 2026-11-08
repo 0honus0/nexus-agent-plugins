@@ -4,7 +4,6 @@ import {
 	hasAgentMemoryContentCapacity,
 } from '@nexus-terminal/shared/agent/memory/values';
 import { AGENT_ARTIFACT_MAX_BYTES } from '@nexus-terminal/shared/agent/artifacts/values';
-import { AGENT_EXECUTION_LIMIT_MAXIMA } from '@nexus-terminal/shared/agent/execution/values';
 import { isAgentPluginVersion } from '@nexus-terminal/shared/agent/plugins/values';
 import { collaborationInput } from '../../../lib/model-tools/collaboration-input.mjs';
 import { RESULT_PAGE_MAX_BYTES, RESULT_PAGE_DEFAULT_BYTES } from '../../../lib/model-tools/limits.mjs';
@@ -213,7 +212,7 @@ const modelDecoders = {
 			kind: 'memory',
 			action: 'recall',
 			query,
-			limit: value.limit === void 0 ? 10 : integer(value.limit, 1, AGENT_EXECUTION_LIMIT_MAXIMA.maxRecallItems),
+			limit: value.limit === void 0 ? 10 : integer(value.limit, 1, Number.MAX_SAFE_INTEGER),
 		};
 	},
 

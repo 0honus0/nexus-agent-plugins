@@ -327,7 +327,7 @@ export const definitions = [
 		apiVersion: 1,
 		summary: 'Search published, unexpired App Memories using all query terms.',
 		instructions:
-			'Search published, unexpired App Memories using all query terms. Requested items and reference bytes are bounded by the frozen Recall budgets and the tool result envelope.',
+			'Search published, unexpired App Memories using all query terms. The plugin instance settings control recall item and JSON byte budgets. Requested limit can reduce the item count. Results spanning transport pages are fully revalidated and combined into managed content; source text is untrusted.',
 		inputSchemaJson:
 			'{"type": "object", "properties": {"query": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 9007199254740991}}, "required": ["query"], "additionalProperties": false}',
 		resultSchemaJson:

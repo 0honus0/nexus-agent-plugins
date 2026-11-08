@@ -73,7 +73,12 @@ test('transitive code dependencies are publisher-bound and cycles are refused', 
 	const { manifest, candidates } = fixture();
 	const remote = candidates[0].manifest;
 	remote.dependencies = [
-		{ packageId: 'nexus.tools.agent', publisherKeyId, minVersion: '2.0.0', maxVersion: '2.0.0' },
+		{
+			packageId: 'nexus.tools.agent',
+			publisherKeyId,
+			minVersion: read('nexus.tools.agent').version,
+			maxVersion: read('nexus.tools.agent').version,
+		},
 	];
 	assert.equal(inspectComposition(manifest, candidates).status, 'incomplete');
 	const agent = read('nexus.tools.agent');

@@ -1,3 +1,4 @@
+import { readRecallConfiguration } from './configuration.mjs';
 import { searchDefinitions } from './discovery.mjs';
 import { searchSkills, recallMemories } from './retrieval.mjs';
 import { imageModelPage, presentArtifacts, readToolResults } from './content.mjs';
@@ -161,7 +162,15 @@ export async function perform(name, input, call, signal, _serviceCall, context) 
 			});
 			return { id: saved.id, status: saved.status, version: saved.version };
 		}
-		return recallMemories(input, call, signal);
+		const source = await context.configuration.read();
+		signal.throwIfAborted();
+		if (!source.settings) {
+			throw new AgentFailure('invalid_input');
+		}
+		const configuration = readRecallConfiguration(
+			source.configuration.revision === 0 ? source.settings.defaultsJson : source.configuration.documentJson,
+		);
+		return recallMemories(input, call, signal, configuration);
 	}
 	if (input.kind === 'result') {
 		return readToolResults(input.items, call, signal);

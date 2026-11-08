@@ -13,6 +13,12 @@ const hash = 'a'.repeat(64);
 function invoke(name, args, call) {
 	return perform(name, decodeInput(name, JSON.stringify(args)), call, signal, undefined, {
 		run: { describe: async () => ({ inputJson: '{"model":{"providerId":"fixture"}}' }) },
+		configuration: {
+			read: async () => ({
+				configuration: { revision: 0 },
+				settings: { defaultsJson: '{"maxRecallItems":5,"maxRecallBytes":8192}' },
+			}),
+		},
 	});
 }
 
@@ -619,4 +625,181 @@ await test('Collaboration message arguments preserve escaped Unicode bodies abov
 		},
 	);
 	assert.deepEqual(result, { sent: true });
+});
+
+test('recall instance settings own item and byte budgets without Host policy ceilings', async () => {
+	const { readRecallConfiguration } = await import('./configuration.mjs');
+	for (const value of [
+		null,
+		{},
+		{ maxRecallItems: 0, maxRecallBytes: 1 },
+		{ maxRecallItems: 1.5, maxRecallBytes: 1 },
+		{ maxRecallItems: 1, maxRecallBytes: -1 },
+		{ maxRecallItems: 1, maxRecallBytes: 1, extra: true },
+	]) {
+		assert.throws(
+			() => readRecallConfiguration(JSON.stringify(value)),
+			(error) => error.code === 'invalid_input',
+		);
+	}
+	assert.deepEqual(readRecallConfiguration('{"maxRecallItems":800,"maxRecallBytes":9007199254740991}'), {
+		maxRecallItems: 800,
+		maxRecallBytes: Number.MAX_SAFE_INTEGER,
+	});
+	const records = Array.from({ length: 30 }, (_, index) => ({
+		id: 'memory-' + String(index).padStart(3, '0'),
+		version: 1,
+		content: 'design ' + '文😀\\"'.repeat(2000),
+		confidence: 1,
+	}));
+	const { recallMemories } = await import('./retrieval.mjs');
+	const { agentPluginCapabilityReplyBytes } = await import('@nexus-terminal/shared/agent/plugins/runtime-codec');
+	const { AGENT_PLUGIN_APP_PAYLOAD_MAX_BYTES } = await import('@nexus-terminal/shared/agent/plugins/values');
+	let selects = 0;
+
+	const call = async (request) => {
+		if (request.action === 'candidates') {
+			return {
+				action: 'candidates',
+				items: records.slice(request.offset, request.offset + 2),
+				nextOffset: request.offset + 2 < records.length ? request.offset + 2 : null,
+				candidatesSha256: hash,
+				maxItems: request.limit,
+				maxBytes: AGENT_PLUGIN_APP_PAYLOAD_MAX_BYTES,
+			};
+		}
+		selects++;
+		const value = {
+			action: 'select',
+			items: request.items.map((reference) => ({
+				...records.find((record) => record.id === reference.id),
+				score: reference.score,
+			})),
+		};
+		assert.ok(
+			agentPluginCapabilityReplyBytes({ operation: 'memory.retrieve', value }) <=
+				AGENT_PLUGIN_APP_PAYLOAD_MAX_BYTES,
+		);
+		return value;
+	};
+
+	const result = await recallMemories({ query: 'design', limit: 30 }, call, signal, {
+		maxRecallItems: 800,
+		maxRecallBytes: 2000000,
+	});
+	assert.equal(result.items.length, 30);
+	assert.ok(Buffer.byteLength(JSON.stringify(result)) > 32768);
+	assert.ok(selects > 1, 'result is completely revalidated across multiple encoded reply frames');
+	assert.deepEqual(
+		result.items.map((item) => item.content),
+		records.map((record) => record.content),
+	);
+	const limited = await recallMemories({ query: 'design', limit: 30 }, call, signal, {
+		maxRecallItems: 2,
+		maxRecallBytes: 2000000,
+	});
+	assert.equal(limited.items.length, 2);
+	const empty = await recallMemories({ query: 'design', limit: 30 }, call, signal, {
+		maxRecallItems: 800,
+		maxRecallBytes: 1,
+	});
+	assert.deepEqual(empty.items, []);
+	await assert.rejects(
+		recallMemories(
+			{ query: 'design', limit: 30 },
+			async (request) => (request.action === 'candidates' ? call(request) : { action: 'select', items: [] }),
+			signal,
+			{ maxRecallItems: 800, maxRecallBytes: 2000000 },
+		),
+		/HOST_MEMORY_SELECTION_MISMATCH/,
+	);
+	let count = 0;
+	await assert.rejects(
+		recallMemories(
+			{ query: 'design', limit: 30 },
+			async (request) => {
+				if (request.action === 'select' && ++count === 2) {
+					throw new Error('version_conflict');
+				}
+				return call(request);
+			},
+			signal,
+			{ maxRecallItems: 800, maxRecallBytes: 2000000 },
+		),
+		/version_conflict/,
+	);
+	assert.equal(count, 2);
+	const controller = new AbortController();
+	count = 0;
+	await assert.rejects(
+		recallMemories(
+			{ query: 'design', limit: 30 },
+			async (request) => {
+				const value = await call(request);
+				if (request.action === 'select') {
+					count++;
+					controller.abort();
+				}
+				return value;
+			},
+			controller.signal,
+			{ maxRecallItems: 800, maxRecallBytes: 2000000 },
+		),
+	);
+	assert.equal(count, 1);
+});
+
+test('memory recall reads saved instance configuration before any Host retrieval', async () => {
+	let configurationReads = 0;
+	const context = {
+		configuration: {
+			read: async () => {
+				configurationReads++;
+				return {
+					configuration: { revision: 2, documentJson: '{"maxRecallItems":1,"maxRecallBytes":5000}' },
+					settings: { defaultsJson: '{"maxRecallItems":5,"maxRecallBytes":8192}' },
+				};
+			},
+		},
+	};
+	const result = await perform(
+		'memory_recall',
+		decodeInput('memory_recall', '{"query":"design","limit":50}'),
+		async (request) =>
+			request.action === 'candidates'
+				? {
+						action: 'candidates',
+						items: [{ id, version: 1, content: 'design', confidence: 1 }],
+						nextOffset: null,
+						candidatesSha256: hash,
+						maxItems: 50,
+						maxBytes: 131072,
+					}
+				: {
+						action: 'select',
+						items: request.items.map((reference) => ({ ...reference, content: 'design', confidence: 1 })),
+					},
+		signal,
+		undefined,
+		context,
+	);
+	assert.equal(configurationReads, 1);
+	assert.equal(result.items.length, 1);
+	await assert.rejects(
+		perform(
+			'memory_recall',
+			decodeInput('memory_recall', '{"query":"design"}'),
+			async () => {
+				throw new Error('Host must not be called');
+			},
+			signal,
+			undefined,
+			{
+				configuration: {
+					read: async () => ({ configuration: { revision: 1, documentJson: '{}' }, settings: {} }),
+				},
+			},
+		),
+		(error) => error.code === 'invalid_input',
+	);
 });
