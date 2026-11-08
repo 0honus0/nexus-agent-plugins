@@ -1,0 +1,35 @@
+{
+  "packageId": "nexus.agent",
+  "cases": [
+    {
+      "id": "nexus.agent:result-preview.native.test:1",
+      "file": "logic/result-preview.native.test.mjs",
+      "behavior": "Model result preview retains exact UTF-8 hash, code-point cursor and encoded budget"
+    },
+    {
+      "id": "nexus.agent:run.native.test:1",
+      "file": "logic/run.native.test.mjs",
+      "behavior": "App resumes the exact model request and consumes its original receipt without duplicate dispatch"
+    },
+    {
+      "id": "nexus.agent:run.native.test:2",
+      "file": "logic/run.native.test.mjs",
+      "behavior": "Automatic compaction checkpoints exact source and preserves the complete tool group, reasoning and retained tail"
+    },
+    {
+      "id": "nexus.agent:run.native.test:3",
+      "file": "logic/run.native.test.mjs",
+      "behavior": "Consecutive useful compactions bind separate source identities while keeping original receipts stable"
+    },
+    {
+      "id": "nexus.agent:run.native.test:4",
+      "file": "logic/run.native.test.mjs",
+      "behavior": "Incomplete earlier execution is quoted as untrusted history instead of replaying unfinished tool proposals"
+    },
+    {
+      "id": "nexus.agent:run.native.test:5",
+      "file": "logic/run.native.test.mjs",
+      "behavior": "Mismatched saved intent rejects before dispatch"
+    }
+  ]
+}

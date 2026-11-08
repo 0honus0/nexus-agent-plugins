@@ -16,7 +16,7 @@ From the repository root:
 
 ```sh
 node plugins/nexus.tools.integrations/build.mjs
-node --test plugins/nexus.tools.integrations/test/integrations.test.mjs
+node --test plugins/nexus.tools.integrations/tests/logic/integrations.native.test.mjs
 ```
 
 The logic suite covers all seven canonical requests, catalog projection, MCP continuation, ACP argument validation,

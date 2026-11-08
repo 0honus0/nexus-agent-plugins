@@ -6,6 +6,6 @@ This independent SDK 4 package owns twenty-two model tools for discovery, skills
 
 The Host owns current authorization, independent domain approval, App resources, model budgets, actual Run and Child identities, captured-result provenance and cleanup. Model output cannot declare trusted artifacts, loaded tools, targets or Child lifecycle state. The package does not invoke another model tool by name.
 
-Build with `node plugins/nexus.tools.agent/build.mjs` from the repository root. Run the package algorithm checks with `node --test plugins/nexus.tools.agent/src/algorithms.test.mjs`. The backend bundle includes the public SDK decoder and the package-owned algorithms; it does not import the Nexus application workspace.
+Build with `node plugins/nexus.tools.agent/build.mjs` from the repository root. Run the package algorithm checks with `node --test plugins/nexus.tools.agent/tests/logic/algorithms.native.test.mjs`. The backend bundle includes the public SDK decoder and the package-owned algorithms; it does not import the Nexus application workspace.
 
 Signing, catalog assembly and releases belong to the repository release workflow and are separate from this package build.

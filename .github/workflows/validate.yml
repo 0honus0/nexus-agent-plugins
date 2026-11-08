@@ -2,13 +2,35 @@ name: Validate
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      host_run_id:
+        description: Successful Nexus Terminal E2E run ID (empty selects latest successful main)
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
 jobs:
   validate:
     name: Plugin validation gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins
+    env:
+      NEXUS_TEST_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts
+      NEXUS_TEST_HOST_ROOT: ${{ github.workspace }}/host
+      NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/candidates/staging-1
+      NEXUS_E2E_DATA_ROOT: ${{ github.workspace }}/test-artifacts/browser-backend
     steps:
       - uses: actions/checkout@v7
+        with:
+          path: plugins
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: plugins/package.json
       - uses: actions/setup-node@v7
         with:
           node-version: 'current'
@@ -16,4 +38,120 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run check
-      - run: pnpm test
+      - name: Run source logic tests
+        run: pnpm test:fast
+      - name: Run package and repository tests
+        run: |
+          mkdir -p "$NEXUS_TEST_ARTIFACT_DIR"
+          node --test --test-reporter=spec --test-reporter=junit \
+            --test-reporter-destination=stdout \
+            --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/packages.xml" \
+            'plugins/*/tests/**/*.native.test.mjs' 'tests/{repository,templates}/**/*.native.test.mjs'
+
+      - name: Pin one successful Host revision
+        id: host
+        uses: actions/github-script@v9
+        env:
+          HOST_RUN_ID: ${{ inputs.host_run_id }}
+        with:
+          github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
+          script: |
+            const owner = '0honus0';
+            const repo = 'nexus-terminal';
+            let run;
+            if (process.env.HOST_RUN_ID) {
+              const runId = Number(process.env.HOST_RUN_ID);
+              if (!Number.isSafeInteger(runId) || runId < 1) throw new Error('Invalid Host run ID');
+              ({ data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId }));
+            } else {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id: 'e2e.yml', branch: 'main', status: 'success', per_page: 1,
+              });
+              [run] = data.workflow_runs;
+            }
+            if (!run || run.status !== 'completed' || run.conclusion !== 'success' || run.path !== '.github/workflows/e2e.yml') {
+              throw new Error('A successful complete Host E2E run is required');
+            }
+            core.setOutput('sha', run.head_sha);
+            core.setOutput('run-id', String(run.id));
+            core.info(`Pinned Host ${owner}/${repo}@${run.head_sha} from E2E run ${run.id}`);
+
+      - name: Checkout pinned Host test sources
+        uses: actions/checkout@v7
+        with:
+          repository: 0honus0/nexus-terminal
+          ref: ${{ steps.host.outputs.sha }}
+          path: host
+      - name: Match Host runtime
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: host/.node-version
+          package-manager-cache: false
+      - name: Install Host protocol test dependencies
+        working-directory: host
+        run: pnpm install --frozen-lockfile
+      - name: Install real Host test services
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          pnpm --dir ../host/tests exec playwright install --with-deps --only-shell chromium
+
+      - name: Resolve the immutable successful Host build
+        id: build
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
+          result-encoding: string
+          script: |
+            const { waitForTestArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/host/scripts/e2e/wait-for-build.mjs`);
+            return await waitForTestArtifact({
+              github, owner: '0honus0', repo: 'nexus-terminal',
+              runId: Number('${{ steps.host.outputs.run-id }}'), sha: '${{ steps.host.outputs.sha }}', kind: 'application',
+            });
+      - name: Download pinned Host build
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
+          repository: 0honus0/nexus-terminal
+          run-id: ${{ steps.host.outputs.run-id }}
+          artifact-ids: ${{ steps.build.outputs.result }}
+          path: host/packages
+          merge-multiple: true
+      - name: Verify Host source and exact build fingerprints
+        working-directory: host
+        env:
+          HOST_SHA: ${{ steps.host.outputs.sha }}
+        run: node scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
+      - name: Sign exact plugin candidates once
+        run: pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
+      - name: Run real Host interoperability
+        run: |
+          node --test --test-reporter=spec --test-reporter=junit \
+            --test-reporter-destination=stdout \
+            --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/interoperability.xml" \
+            'tests/interoperability/**/*.native.test.mjs'
+      - name: Run plugin browser behavior against exact candidates
+        run: |
+          pnpm check:browser
+          pnpm test:browser
+      - name: Upload test reports and combinations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-tests-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            test-artifacts/*.xml
+            test-artifacts/*combination*.json
+            test-artifacts/reports/*
+            test-artifacts/browser/report.json
+            test-artifacts/**/timings.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain failed Host evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-host-failure-${{ github.sha }}-${{ github.run_attempt }}
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

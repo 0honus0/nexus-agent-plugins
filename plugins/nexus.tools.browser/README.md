@@ -16,7 +16,7 @@ From the repository root:
 
 ```sh
 node plugins/nexus.tools.browser/build.mjs
-node --test plugins/nexus.tools.browser/test/browser.test.mjs
+node --test plugins/nexus.tools.browser/tests/contract/browser.native.test.mjs
 ```
 
 The logic suite covers all sixteen canonical requests, defaults, explicit result projection, snapshot sequencing,

@@ -13,19 +13,27 @@
     "format": "eslint --fix . && prettier --write .",
     "format:check": "prettier --check .",
     "verify:package": "node scripts/verify-package.mjs",
-    "test": "pnpm run build:tools && pnpm run test:repository && pnpm run test:plugins",
+    "test": "pnpm test:fast && pnpm test:native",
     "check:composition": "node scripts/check-composition.mjs",
     "build:staging": "node scripts/build-staging.mjs",
     "build:tools": "node plugins/nexus.tools.remote/build.mjs && node plugins/nexus.tools.browser/build.mjs && node plugins/nexus.tools.integrations/build.mjs && node plugins/nexus.tools.agent/build.mjs",
     "build:app": "node plugins/nexus.agent/build.mjs",
     "build:ui": "pnpm --dir plugins/nexus.ui.chat run build",
     "build": "pnpm run build:tools && pnpm run build:services && pnpm run build:app && pnpm run build:ui && pnpm run build:templates",
-    "test:tools": "node --test plugins/nexus.tools.remote/src/algorithms.test.mjs plugins/nexus.tools.browser/test/browser.test.mjs plugins/nexus.tools.integrations/test/integrations.test.mjs plugins/nexus.tools.agent/src/algorithms.test.mjs",
+    "test:tools": "node --test \"plugins/nexus.tools.*/tests/**/*.native.test.mjs\"",
     "build:services": "node plugins/nexus.services.mcp/build.mjs && node plugins/nexus.services.acp/build.mjs",
     "build:templates": "node scripts/build-templates.mjs",
-    "test:services": "node --test plugins/nexus.services.mcp/test/*.test.mjs plugins/nexus.services.acp/test/*.test.mjs",
-    "test:repository": "node --test scripts/composition.test.mjs scripts/package-release.test.mjs scripts/release-download.test.mjs",
-    "test:plugins": "pnpm --recursive --workspace-concurrency=1 --filter './plugins/**' run test"
+    "test:services": "node --test \"plugins/nexus.services.*/tests/**/*.native.test.mjs\"",
+    "test:repository": "node --test \"tests/repository/**/*.native.test.mjs\"",
+    "test:plugins": "vitest run && node --test \"plugins/*/tests/**/*.native.test.mjs\"",
+    "test:templates": "node --test \"tests/templates/**/*.native.test.mjs\"",
+    "test:interop": "node --test \"tests/interoperability/**/*.native.test.mjs\"",
+    "prepare:interop": "node scripts/prepare-host-validation.mjs",
+    "test:all": "pnpm test && pnpm test:interop && pnpm check:browser && pnpm test:browser",
+    "test:fast": "vitest run",
+    "test:native": "node --test \"plugins/*/tests/**/*.native.test.mjs\" \"tests/{repository,templates}/**/*.native.test.mjs\"",
+    "test:browser": "pnpm --dir \"$NEXUS_TEST_HOST_ROOT/tests\" exec playwright test --config \"$PWD/playwright.config.ts\"",
+    "check:browser": "pnpm test:browser --list && pnpm --dir \"$NEXUS_TEST_HOST_ROOT/packages/frontend\" exec vue-tsc --noEmit -p \"$NEXUS_TEST_ARTIFACT_DIR/browser/tsconfig.json\""
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.4",
@@ -37,7 +45,8 @@
     "tailwindcss": "4.3.4",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "8.3.5",
-    "vue-tsc": "^3.3.14"
+    "vue-tsc": "^3.3.14",
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "7.3.1",

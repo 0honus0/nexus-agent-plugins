@@ -1,0 +1,30 @@
+{
+  "packageId": "nexus.ui.chat",
+  "cases": [
+    {
+      "id": "nexus.ui.chat:chat-client.native.test:1",
+      "file": "logic/chat-client.test.mjs",
+      "behavior": "A named SDK write failure keeps its unknown outcome through the actual UI request adapter"
+    },
+    {
+      "id": "nexus.ui.chat:chat-client.native.test:2",
+      "file": "logic/chat-client.test.mjs",
+      "behavior": "A completed native Run retires its real UI projection during apply and preserves independent work"
+    },
+    {
+      "id": "nexus.ui.chat:chat-history.native.test:1",
+      "file": "logic/chat-history.test.mjs",
+      "behavior": "Agent transcript keeps row and image identity during text deltas and rejects malformed pages atomically"
+    },
+    {
+      "id": "nexus.ui.chat:chat-history.native.test:2",
+      "file": "logic/chat-history.test.mjs",
+      "behavior": "Agent history releases only whole offscreen messages and restores the exact paging boundary"
+    },
+    {
+      "id": "nexus.ui.chat:chat-history.native.test:3",
+      "file": "logic/chat-history.test.mjs",
+      "behavior": "late conversation restoration preserves drawer intent while explicit choices remain interactive"
+    }
+  ]
+}

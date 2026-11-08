@@ -9,7 +9,7 @@
     "lint": "eslint src vite.config.ts",
     "format": "prettier --write src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",
     "format:check": "prettier --check src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",
-    "test": "node --test tests/*.integration.mjs"
+    "test": "pnpm --workspace-root exec vitest run plugins/nexus.ui.chat/tests"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "7.3.1",
