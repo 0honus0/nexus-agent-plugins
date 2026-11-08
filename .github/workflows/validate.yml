@@ -12,10 +12,15 @@ permissions:
   contents: read
   actions: read
 jobs:
-  validate:
-    name: Plugin validation gate
+  quality:
+    name: Build and validate packages
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      host-sha: ${{ steps.host.outputs.sha }}
+      host-run-id: ${{ steps.host.outputs.run-id }}
+      host-artifact-id: ${{ steps.build.outputs.result }}
+      plugin-artifact-id: ${{ steps.candidates.outputs.artifact-id }}
     defaults:
       run:
         working-directory: plugins
@@ -25,13 +30,13 @@ jobs:
       NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/candidates/staging-1
       NEXUS_E2E_DATA_ROOT: ${{ github.workspace }}/test-artifacts/browser-backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           path: plugins
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: plugins/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: 'current'
           package-manager-cache: false
@@ -50,7 +55,7 @@ jobs:
 
       - name: Pin one successful Host revision
         id: host
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         env:
           HOST_RUN_ID: ${{ inputs.host_run_id }}
         with:
@@ -77,28 +82,22 @@ jobs:
             core.info(`Pinned Host ${owner}/${repo}@${run.head_sha} from E2E run ${run.id}`);
 
       - name: Checkout pinned Host test sources
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: 0honus0/nexus-terminal
           ref: ${{ steps.host.outputs.sha }}
           path: host
       - name: Match Host runtime
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: host/.node-version
           package-manager-cache: false
       - name: Install Host protocol test dependencies
         working-directory: host
         run: pnpm install --frozen-lockfile
-      - name: Install real Host test services
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openssh-server
-          pnpm --dir ../host/tests exec playwright install --with-deps --only-shell chromium
-
       - name: Resolve the immutable successful Host build
         id: build
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
           result-encoding: string
@@ -109,7 +108,7 @@ jobs:
               runId: Number('${{ steps.host.outputs.run-id }}'), sha: '${{ steps.host.outputs.sha }}', kind: 'application',
             });
       - name: Download pinned Host build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
           repository: 0honus0/nexus-terminal
@@ -124,21 +123,25 @@ jobs:
         run: node scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
       - name: Sign exact plugin candidates once
         run: pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
-      - name: Run real Host interoperability
-        run: |
-          node --test --test-reporter=spec --test-reporter=junit \
-            --test-reporter-destination=stdout \
-            --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/interoperability.xml" \
-            'tests/interoperability/**/*.native.test.mjs'
-      - name: Run plugin browser behavior against exact candidates
-        run: |
-          pnpm check:browser
-          pnpm test:browser
+      - name: Check all browser sources and discovery
+        run: pnpm check:browser
+      - name: Archive compiled plugins without rebuilding in shards
+        run: tar --exclude=node_modules --exclude=.git -czf "$NEXUS_TEST_ARTIFACT_DIR/plugin-test-source.tar.gz" .
+      - name: Upload one immutable plugin build and candidate set
+        id: candidates
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: plugin-candidates-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            test-artifacts/plugin-test-source.tar.gz
+            test-artifacts/candidates/staging-1/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload test reports and combinations
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
-          name: plugin-tests-${{ github.sha }}-${{ github.run_attempt }}
+          name: plugin-quality-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             test-artifacts/*.xml
             test-artifacts/*combination*.json
@@ -149,9 +152,121 @@ jobs:
           retention-days: 14
       - name: Retain failed Host evidence
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: plugin-host-failure-${{ github.sha }}-${{ github.run_attempt }}
-          path: test-artifacts/
+          path: |
+            test-artifacts/
+            !test-artifacts/candidates/development-publisher.pem
+          if-no-files-found: ignore
+          retention-days: 7
+
+  tests:
+    name: Plugin tests shard ${{ matrix.shard }}
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    container:
+      image: ghcr.io/0honus0/nexus-terminal-e2e-runner:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+      options: --init --ipc=host --cap-add=SYS_PTRACE
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    defaults:
+      run:
+        working-directory: plugins
+    env:
+      NEXUS_TEST_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts/layers
+      NEXUS_TEST_HOST_ROOT: ${{ github.workspace }}/host
+      NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/shared/candidates/staging-1
+      NEXUS_E2E_DATA_ROOT: ${{ github.workspace }}/test-artifacts/browser-backend
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          path: plugins
+      - name: Checkout the same pinned Host revision
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: 0honus0/nexus-terminal
+          ref: ${{ needs.quality.outputs.host-sha }}
+          path: host
+      - name: Register canonical checkout paths
+        run: |
+          git config --global --add safe.directory "$(pwd -P)"
+          git config --global --add safe.directory "$(realpath ../host)"
+      - name: Link Host dependencies from the runner cache
+        working-directory: host
+        run: |
+          expected="$(node scripts/e2e/runner-image-info.mjs fingerprint)"
+          if [ "${E2E_RUNNER_FINGERPRINT:-}" = "$expected" ]; then
+            pnpm install --frozen-lockfile --offline
+          else
+            echo "Runner fingerprint differs; downloading missing dependencies."
+            pnpm install --frozen-lockfile --prefer-offline
+            pnpm --filter @nexus-terminal/tests exec playwright install --only-shell chromium
+          fi
+      - name: Download the pinned successful Host build
+        uses: actions/download-artifact@v8.0.2
+        with:
+          github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
+          repository: 0honus0/nexus-terminal
+          run-id: ${{ needs.quality.outputs.host-run-id }}
+          artifact-ids: ${{ needs.quality.outputs.host-artifact-id }}
+          path: host/packages
+          merge-multiple: true
+      - name: Download this run's exact plugin build and candidates
+        uses: actions/download-artifact@v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          artifact-ids: ${{ needs.quality.outputs.plugin-artifact-id }}
+          path: test-artifacts/shared
+          merge-multiple: true
+      - name: Restore and verify exact builds
+        env:
+          HOST_SHA: ${{ needs.quality.outputs.host-sha }}
+        run: |
+          tar -xzf ../test-artifacts/shared/plugin-test-source.tar.gz
+          pnpm install --frozen-lockfile --prefer-offline
+          node ../host/scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
+      - name: Run real Host interoperability shard
+        id: interoperability
+        run: |
+          mkdir -p "$NEXUS_TEST_ARTIFACT_DIR/reports"
+          node --test --test-concurrency=1 --test-shard="${{ matrix.shard }}/8" \
+            --test-reporter=spec --test-reporter=junit \
+            --test-reporter-destination=stdout \
+            --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/reports/interoperability.xml" \
+            'tests/interoperability/**/*.native.test.mjs'
+      - name: Run plugin browser shard against the same candidates
+        if: ${{ !cancelled() && steps.interoperability.outcome != 'skipped' }}
+        run: pnpm test:browser --shard "${{ matrix.shard }}/8"
+      - name: Upload shard reports and combinations
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: plugin-tests-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            test-artifacts/layers/reports/*
+            test-artifacts/layers/*combination*.json
+            test-artifacts/layers/browser/report.json
+            test-artifacts/**/timings.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain failed Host evidence
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: plugin-host-failure-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            test-artifacts/layers/
+            test-artifacts/browser-backend/
           if-no-files-found: ignore
           retention-days: 7
