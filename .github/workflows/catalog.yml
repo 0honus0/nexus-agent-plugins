@@ -34,6 +34,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Download and aggregate original signed artifacts
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_DESCRIPTORS: ${{ inputs.release_descriptors }}
           BASE_CATALOGS: ${{ inputs.base_catalogs }}
           RECOMMENDED_APPS: ${{ inputs.recommended_apps }}

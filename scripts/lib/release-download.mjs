@@ -1,3 +1,4 @@
+import childProcess from 'node:child_process';
 import { setTimeout } from 'node:timers/promises';
 
 async function readBytes(response, limit) {
@@ -16,6 +17,39 @@ async function readBytes(response, limit) {
 	return Buffer.concat(chunks, size);
 }
 
+function githubReleaseAsset(source, limit) {
+	if (!process.env.GH_TOKEN && !process.env.GITHUB_TOKEN) {
+		return null;
+	}
+	const match = source.pathname.match(
+		/^\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/releases\/download\/([^/]+)\/([A-Za-z0-9_.-]+)$/u,
+	);
+	if (source.origin !== 'https://github.com' || source.username || source.password || source.search || !match) {
+		return null;
+	}
+	console.warn(`Reading release asset through the GitHub API: ${source.origin}${source.pathname}`);
+	const bytes = childProcess.execFileSync(
+		'gh',
+		[
+			'release',
+			'download',
+			'--repo',
+			match[1] + '/' + match[2],
+			'--pattern',
+			match[4],
+			'--output',
+			'-',
+			'--',
+			decodeURIComponent(match[3]),
+		],
+		{ maxBuffer: limit + 1 },
+	);
+	if (bytes.byteLength > limit) {
+		throw new Error('PLUGIN_RELEASE_DOWNLOAD_TOO_LARGE');
+	}
+	return bytes;
+}
+
 /** Retry only idempotent reads after transient network/5xx failures; archive identity is checked later. */
 export async function downloadReleaseBytes(url, limit) {
 	const source = new URL(url);
@@ -30,7 +64,7 @@ export async function downloadReleaseBytes(url, limit) {
 				return await readBytes(response, limit);
 			}
 		} catch (error) {
-			if (!(error instanceof TypeError) || attempt === 2) {
+			if (!(error instanceof TypeError)) {
 				throw error;
 			}
 			response = undefined;
@@ -38,6 +72,12 @@ export async function downloadReleaseBytes(url, limit) {
 		const retryable = !response || response.status >= 500;
 		await response?.body?.cancel();
 		if (!retryable || attempt === 2) {
+			if (retryable) {
+				const bytes = githubReleaseAsset(source, limit);
+				if (bytes !== null) {
+					return bytes;
+				}
+			}
 			throw new Error(
 				`PLUGIN_RELEASE_DOWNLOAD_FAILED: ${source.origin}${source.pathname} HTTP ${response?.status ?? 'network'}`,
 			);

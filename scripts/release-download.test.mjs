@@ -1,3 +1,4 @@
+import childProcess from 'node:child_process';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { downloadReleaseBytes } from './lib/release-download.mjs';
@@ -70,4 +71,45 @@ test('release download restarts a failed response stream instead of returning pa
 	});
 	assert.equal((await downloadReleaseBytes(url, 100)).toString(), 'complete archive');
 	assert.equal(calls, 2);
+});
+
+test('canonical GitHub assets can use the authenticated API after gateway failure while keeping original bytes', async (t) => {
+	const previous = process.env.GH_TOKEN;
+	process.env.GH_TOKEN = 'test-token';
+	t.after(() => {
+		if (previous === undefined) {
+			delete process.env.GH_TOKEN;
+		} else {
+			process.env.GH_TOKEN = previous;
+		}
+	});
+	let calls = 0;
+	t.mock.method(globalThis, 'fetch', async () => {
+		calls++;
+		return new Response('gateway', { status: 504 });
+	});
+	const cli = t.mock.method(childProcess, 'execFileSync', (command, args, options) => {
+		assert.equal(command, 'gh');
+		assert.deepEqual(args, [
+			'release',
+			'download',
+			'--repo',
+			'owner/repository',
+			'--pattern',
+			'package.tar',
+			'--output',
+			'-',
+			'--',
+			'v2.1.0',
+		]);
+		assert.equal(options.maxBuffer, 101);
+		return Buffer.from('original signed archive');
+	});
+	const result = await downloadReleaseBytes(
+		'https://github.com/owner/repository/releases/download/v2.1.0/package.tar',
+		100,
+	);
+	assert.equal(result.toString(), 'original signed archive');
+	assert.equal(calls, 3);
+	assert.equal(cli.mock.callCount(), 1);
 });
