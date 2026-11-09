@@ -109,8 +109,8 @@ jobs:
           github-token: ${{ secrets.NEXUS_HOST_READ_TOKEN || github.token }}
           result-encoding: string
           script: |
-            const { waitForTestArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/host/scripts/e2e/wait-for-build.mjs`);
-            return await waitForTestArtifact({
+            const { resolveBuildArtifact } = await import(`${process.env.GITHUB_WORKSPACE}/host/scripts/e2e/resolve-build-artifact.mjs`);
+            return await resolveBuildArtifact({
               github, owner: '0honus0', repo: 'nexus-terminal',
               runId: Number('${{ steps.host.outputs.run-id }}'), sha: '${{ steps.host.outputs.sha }}', kind: 'application',
             });

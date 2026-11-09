@@ -4,7 +4,7 @@ Independent signed packages for [Nexus Terminal](https://github.com/0honus0/nexu
 
 ## SDK and composition
 
-Packages use manifest 4 and public SDK 4. `sdk/nexus-terminal-shared-4.0.1.tgz` supplies compiled contracts, `sdk/backend-v4.mjs` supplies the standalone backend adapter, and UI imports the Host runtime `/sdk/frontend-v4.mjs`. No private Host source or checkout participates in plugin builds. See [SDK distribution](sdk/README.md).
+Packages use manifest 4 and public SDK 4. `sdk/nexus-terminal-shared-4.0.4.tgz` supplies compiled contracts, `sdk/backend-v4.mjs` supplies the standalone backend adapter, and UI imports the Host runtime `/sdk/frontend-v4.mjs`. No private Host source or checkout participates in plugin builds. See [SDK distribution](sdk/README.md).
 
 An App registers one complete asynchronous `run(input, context)` handler through `definePlugin`. It owns model calls, tool discovery, parallelism, context, checkpoints, suspension and completion. The Host does not run fixed phases or assume every App needs a model. `nexus.agent` owns the default chat/image algorithm; its optional tools and UI are selected by the user, rather than frozen into App code dependencies.
 
@@ -51,7 +51,7 @@ node scripts/build-catalog-release.mjs .dist/catalog.json .dist/remote/nexus.too
 Archives sign the original manifest and file hashes under `NEXUS_AGENT_PLUGIN_V4` using Ed25519. Only declared runtime assets, documentation and Skills enter the archive. Different content requires a new package version; existing archives/descriptors cannot be overwritten. Publisher secrets are external to the repository.
 
 1. Change a package, bump its manifest version, and verify compatibility and any true code dependencies.
-2. Push and wait for `Plugin validation gate` on the exact source SHA. CI builds only this repository and its pinned SDK artifacts.
+2. Push and wait for the complete `Validate` workflow on the exact source SHA: package quality and all eight Host interoperability/browser shards must succeed. Release checks this workflow result; there is no legacy single-job gate.
 3. Create a draft release. Run `Release package` for each changed package and that release tag. It verifies repository-wide immutable identities and uploads only missing matching assets; it does not publish the draft.
 4. Publish the package assets. Run `Aggregate catalog` with existing catalog URLs, the new descriptor URLs, and the recommended App IDs. Aggregation verifies original signed archives and retains prior versions/URLs; it never rebuilds packages.
 5. Publish the new catalog after verification. A compatible tool, service or UI update does not require a new App or Host build. New privileged Host capabilities still require Host support.
