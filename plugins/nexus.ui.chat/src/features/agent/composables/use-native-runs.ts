@@ -677,7 +677,7 @@ export function useNativeRuns(
 		const generation = updateGeneration;
 		await operation.execute(
 			async (signal) => {
-				const [page, permits, descendants, initialBody, toolPage] = await Promise.all([
+				const [page, permits, descendants, initialBody, initialTools] = await Promise.all([
 					listNativeEvents(current, selected.id, eventCursor.value, signal),
 					listNativeApprovals(current, selected.id, signal),
 					listNativeChildren(current, selected.id, signal),
@@ -689,13 +689,15 @@ export function useNativeRuns(
 					throw new AgentManagementFailure('not_found', 'confirmed');
 				if (latest.version < selected.version || page.items.some((item) => item.runVersion > latest.version))
 					throw new AgentManagementFailure('protocol_failure', 'unknown');
-				// A Run can finish after the body read but before the status read. At its terminal state,
-				// read the final durable entries again instead of leaving the reply behind its cursor.
-				const stopped = !isNativeRunActive(latest);
-				const body =
-					stopped && latest.version > selected.version
-						? await listNativeEntries(current, selectedThread.id, entryCursor.value, signal)
-						: initialBody;
+				// These reads can precede the terminal Run commit. Re-read both durable projections
+				// after observing that commit; an unchanged terminal stream snapshot will not refresh them.
+				const [body, toolPage] =
+					!isNativeRunActive(latest) && latest.version > selected.version
+						? await Promise.all([
+								listNativeEntries(current, selectedThread.id, entryCursor.value, signal),
+								listNativeThreadTools(current.appId, selectedThread.id, null, undefined, signal),
+							])
+						: [initialBody, initialTools];
 				const usage = await getNativeRunUsage(current, selected.id, signal);
 				if (usage.runVersion < latest.version) throw new AgentManagementFailure('protocol_failure', 'unknown');
 				return { latest, page, permits, descendants, body, usage, toolPage };
@@ -743,11 +745,16 @@ export function useNativeRuns(
 		const selected = thread.value;
 		if (!current || !selected || disposed) return;
 		const threadId = selected.id;
-		const generation = updateGeneration;
+		const generation = selectionGeneration;
 		await operation.execute(
 			(signal) => listNativeThreadTools(current.appId, threadId, null, undefined, signal),
 			(page) => {
-				if (generation !== updateGeneration || thread.value?.id !== threadId) return;
+				if (
+					generation !== selectionGeneration ||
+					scope.value?.appId !== current.appId ||
+					thread.value?.id !== threadId
+				)
+					return;
 				tools.value = mergeNativeTools(tools.value, page.items);
 				toolCursor.value = page.nextCursor;
 			},
@@ -761,11 +768,16 @@ export function useNativeRuns(
 		const before = toolCursor.value;
 		if (!current || !selected || before === null || disposed) return;
 		const threadId = selected.id;
-		const generation = updateGeneration;
+		const generation = selectionGeneration;
 		await operation.execute(
 			(signal) => listNativeThreadTools(current.appId, threadId, before, undefined, signal),
 			(page) => {
-				if (generation !== updateGeneration || thread.value?.id !== threadId) return;
+				if (
+					generation !== selectionGeneration ||
+					scope.value?.appId !== current.appId ||
+					thread.value?.id !== threadId
+				)
+					return;
 				tools.value = mergeNativeTools(tools.value, page.items);
 				toolCursor.value = page.nextCursor;
 			},

@@ -19,3 +19,5 @@ The build writes UI assets to `frontend/` and provenance to `SOURCE-MANIFEST.jso
 The `tests/` suites exercise transcript identity, paged history, malformed-page atomicity, request failure outcomes and subscription cleanup against the actual UI modules. The repository-wide test command includes them; signed installation and browser interaction are verified by Host E2E.
 
 Automatic conversation restoration preserves an already opened narrow-screen drawer. Explicit thread selection still dismisses the drawer.
+
+Tool summaries refresh with the final durable Run snapshot. Stopping a completed Run subscription preserves same-thread reads; switching or removing a thread still rejects late snapshots. This is covered by deterministic composable tests with virtual timers.

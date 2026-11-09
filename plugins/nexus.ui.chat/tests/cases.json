@@ -25,6 +25,26 @@
       "id": "nexus.ui.chat:chat-history.native.test:3",
       "file": "logic/chat-history.test.mjs",
       "behavior": "late conversation restoration preserves drawer intent while explicit choices remain interactive"
+    },
+    {
+      "id": "nexus.ui.chat:chat-tool-snapshot.test:1",
+      "file": "logic/chat-tool-snapshot.test.mjs",
+      "behavior": "terminal Run snapshots reread tools committed after the initial tool page"
+    },
+    {
+      "id": "nexus.ui.chat:chat-tool-snapshot.test:2",
+      "file": "logic/chat-tool-snapshot.test.mjs",
+      "behavior": "active Run snapshots keep one parallel tool read"
+    },
+    {
+      "id": "nexus.ui.chat:chat-tool-snapshot.test:3",
+      "file": "logic/chat-tool-snapshot.test.mjs",
+      "behavior": "stopping a terminal subscription accepts the same thread in-flight tool snapshot"
+    },
+    {
+      "id": "nexus.ui.chat:chat-tool-snapshot.test:4",
+      "file": "logic/chat-tool-snapshot.test.mjs",
+      "behavior": "removing the selected thread prevents a late tool snapshot from reappearing"
     }
   ]
 }
