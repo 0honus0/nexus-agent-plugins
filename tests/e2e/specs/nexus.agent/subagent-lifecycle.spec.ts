@@ -36,7 +36,10 @@ test('Nexus Agent subagent lifecycle preserves tool batches and reclaims child B
 	page,
 }) => {
 	await loginAsInitialAdmin(request);
-	const installed = await installTestPlugin(request, 'nexus.agent');
+	const installed = await installTestPlugin(request, 'nexus.agent', undefined, {
+		selectedRootIds: ['nexus.tools.browser', 'nexus.tools.agent'],
+		uiPackageId: 'nexus.ui.chat',
+	});
 	const app = await enablePluginApp(request, installed.appId);
 	const task = await prepareNativeTask(
 		request,

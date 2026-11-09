@@ -27,7 +27,14 @@ test('SSH file lifecycle binds mutations to hashes and fingerprints and rejects 
 }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['file.read', 'file.write', 'file.delete'], [connectionId]);
+	const task = await prepareNativeTask(
+		request,
+		page,
+		['file.read', 'file.write', 'file.delete'],
+		[connectionId],
+		undefined,
+		['nexus.tools.remote', 'nexus.tools.agent'],
+	);
 	const project = path.join(controlledSshRoot, 'file-lifecycle');
 	const preserved = '{"business":"keep","version":1}\n';
 	await mkdir(project);
@@ -66,7 +73,10 @@ for (const repeat of [false, true]) {
 	}) => {
 		await loginAsInitialAdmin(request);
 		const connectionId = await ensureTestSshConnection(request);
-		const task = await prepareNativeTask(request, page, ['file.read'], [connectionId]);
+		const task = await prepareNativeTask(request, page, ['file.read'], [connectionId], undefined, [
+			'nexus.tools.remote',
+			'nexus.tools.agent',
+		]);
 		const project = path.join(controlledSshRoot, 'search-scan');
 		await mkdir(project);
 		await writeFile(path.join(project, 'sentinel.txt'), 'SCAN_SENTINEL\n');
@@ -90,7 +100,12 @@ for (const repeat of [false, true]) {
 				})
 				.toBe(0);
 			expect((await request.post(hold + '?blocked=0')).ok()).toBe(true);
-			const recovery = repeat ? task : await prepareNativeTask(request, page, ['file.read'], [connectionId]);
+			const recovery = repeat
+				? task
+				: await prepareNativeTask(request, page, ['file.read'], [connectionId], undefined, [
+						'nexus.tools.remote',
+						'nexus.tools.agent',
+					]);
 			await openNativeTask(recovery);
 			const next = await startNativeTask(recovery, `E2E_SEARCH_SCAN connection=${connectionId}`, [connectionId]);
 			const result = await finishNativeTask(recovery, next.id);
@@ -113,7 +128,10 @@ for (const repeat of [false, true]) {
 test('SSH file search traverses deep directories without changing the matching file', async ({ request, page }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId]);
+	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId], undefined, [
+		'nexus.tools.remote',
+		'nexus.tools.agent',
+	]);
 	const project = path.join(controlledSshRoot, 'search-scan');
 	const leaf = path.join(project, ...Array.from({ length: 96 }, () => 'nested'), 'sentinel.txt');
 	await mkdir(path.dirname(leaf), { recursive: true });
@@ -152,7 +170,10 @@ test('SSH search traverses complete file content and never follows a symlink to 
 }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId]);
+	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId], undefined, [
+		'nexus.tools.remote',
+		'nexus.tools.agent',
+	]);
 	const project = path.join(controlledSshRoot, 'search-scan');
 	await mkdir(project);
 	let runId: string | undefined;

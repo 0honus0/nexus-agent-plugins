@@ -117,7 +117,10 @@ test('installed Nexus Agent plugin uses the installed chat UI iframe and capture
 	const request = context.request;
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const installed = await installTestPlugin(request, 'nexus.agent');
+	const installed = await installTestPlugin(request, 'nexus.agent', undefined, {
+		selectedRootIds: ['nexus.tools.remote', 'nexus.tools.agent'],
+		uiPackageId: 'nexus.ui.chat',
+	});
 	const app = await enablePluginApp(request, installed.appId);
 	const task = await prepareNativeTask(
 		request,

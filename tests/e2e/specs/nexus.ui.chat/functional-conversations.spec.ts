@@ -29,7 +29,10 @@ test('A01 read-only project handover reads real files without repairing or start
 }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId]);
+	const task = await prepareNativeTask(request, page, ['file.read'], [connectionId], undefined, [
+		'nexus.tools.remote',
+		'nexus.tools.agent',
+	]);
 	const fixture = path.resolve(import.meta.dirname, '../../fixtures/task-projects/startup-failure');
 	const project = path.join(controlledSshRoot, 'task-a01');
 	const files = ['AGENTS.md', 'README.md', 'package.json', 'config.json', 'server.mjs', 'data/catalog.json'];
@@ -68,7 +71,7 @@ test('A01 read-only project handover reads real files without repairing or start
 });
 
 test('read-only delivery keeps future repair outside the Run without executing tools', async ({ request, page }) => {
-	const task = await prepareNativeTask(request, page);
+	const task = await prepareNativeTask(request, page, [], [], undefined, ['nexus.tools.agent']);
 	await openNativeTask(task);
 	const run = await startNativeTask(
 		task,
@@ -97,7 +100,7 @@ test('a clarification completes one Run and explicit follow-up creates another i
 	request,
 	page,
 }) => {
-	const task = await prepareNativeTask(request, page);
+	const task = await prepareNativeTask(request, page, [], [], undefined, ['nexus.tools.agent']);
 	await openNativeTask(task);
 	const first = await startNativeTask(
 		task,
@@ -120,7 +123,7 @@ test('recorded JSON and marker cases preserve exact output through a later Run i
 	request,
 	page,
 }) => {
-	const task = await prepareNativeTask(request, page);
+	const task = await prepareNativeTask(request, page, [], [], undefined, ['nexus.tools.agent']);
 	await openNativeTask(task);
 	const ids = new Set<string>();
 	for (const fixture of regressionInputs.modelOutputs) {
@@ -142,7 +145,7 @@ test('reopening a completed clarification restores history and explicit follow-u
 	page,
 	context,
 }) => {
-	const task = await prepareNativeTask(context.request, page);
+	const task = await prepareNativeTask(context.request, page, [], [], undefined, ['nexus.tools.agent']);
 	await openNativeTask(task);
 	const created = await startNativeTask(task, 'E2E_REGRESSION_CLARIFICATION_UI');
 	const question = await finishNativeTask(task, created.id);

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vue-tsc --noEmit -p tsconfig.json && vite build && node build.mjs",
-    "check": "vue-tsc --noEmit -p tsconfig.json",
+    "build": "pnpm run check && vite build && node build.mjs",
+    "check": "vue-tsc --noEmit -p tsconfig.json --incremental --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo",
     "lint": "eslint src vite.config.ts",
     "format": "prettier --write src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",
     "format:check": "prettier --check src vite.config.ts tsconfig.json package.json build.mjs eslint.config.mjs README.md",

@@ -24,7 +24,10 @@ for (const width of [1280, 390, 320]) {
 				async ({ page, request }, testInfo) => {
 					await loginAsInitialAdmin(request);
 					const connectionId = await ensureTestSshConnection(request);
-					const task = await prepareNativeTask(request, page, ['shell.execute'], [connectionId]);
+					const task = await prepareNativeTask(request, page, ['shell.execute'], [connectionId], undefined, [
+						'nexus.tools.remote',
+						'nexus.tools.agent',
+					]);
 					const hub = await openNativeTask(task);
 					const run = await startNativeTask(task, `E2E_NATIVE_PLUGIN_NOTICES connection=${connectionId}`, [
 						connectionId,

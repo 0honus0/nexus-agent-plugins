@@ -36,7 +36,10 @@ test('Nexus Agent Browser lifecycle cases reclaim contexts across cancellation a
 }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const installed = await installTestPlugin(request, 'nexus.agent');
+	const installed = await installTestPlugin(request, 'nexus.agent', undefined, {
+		selectedRootIds: ['nexus.tools.remote', 'nexus.tools.browser'],
+		uiPackageId: 'nexus.ui.chat',
+	});
 	const app = await enablePluginApp(request, installed.appId);
 	const task = await prepareNativeTask(
 		request,

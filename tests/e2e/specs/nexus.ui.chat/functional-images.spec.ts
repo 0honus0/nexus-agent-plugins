@@ -51,7 +51,14 @@ for (const { format, nested } of [
 		request,
 		page,
 	}, testInfo) => {
-		const task = await prepareNativeTask(request, page, ['context.read', 'artifacts.read', 'artifacts.write']);
+		const task = await prepareNativeTask(
+			request,
+			page,
+			['context.read', 'artifacts.read', 'artifacts.write'],
+			[],
+			undefined,
+			['nexus.tools.agent'],
+		);
 		await requestAgentJson(
 			request,
 			{
@@ -150,7 +157,6 @@ for (const { format, nested } of [
 			expect((await download.body()).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
 		}
 		await testInfo.attach('generated-' + format, { body: await page.screenshot(), contentType: 'image/png' });
-		await page.reload();
 		await openNativeTask(task);
 		await expect(preview).toHaveAttribute('src', /^blob:/);
 		await expect
@@ -169,7 +175,14 @@ for (const scenario of [
 		request,
 		page,
 	}) => {
-		const task = await prepareNativeTask(request, page, ['context.read', 'artifacts.read', 'artifacts.write']);
+		const task = await prepareNativeTask(
+			request,
+			page,
+			['context.read', 'artifacts.read', 'artifacts.write'],
+			[],
+			undefined,
+			['nexus.tools.agent'],
+		);
 		await requestAgentJson(
 			request,
 			{
@@ -232,7 +245,6 @@ for (const scenario of [
 		const attempts = await request.get(E2E_URLS.openAiProviderOrigin + '/image-requests');
 		expect(attempts.status()).toBe(200);
 		expect(await attempts.json()).toEqual({ [scenario.modelId]: 1 });
-		await page.reload();
 		await openNativeTask(task);
 		await expect(hub).toContainText(message);
 		await expect(hub.locator('.agent-generated-image')).toHaveCount(0);

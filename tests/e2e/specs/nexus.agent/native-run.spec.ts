@@ -1,6 +1,6 @@
 import { controlledSshRoot } from '@nexus-test/e2e/support/service-paths';
 import { hasToolIdentity, hasApprovalIdentity } from '@nexus-test/support/package-tool-catalog.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -55,7 +55,10 @@ test('remote signed Nexus Agent plugin installs, registers an Agent definition, 
 	);
 	const executable = catalog.packages.find((entry) => entry.packageId === 'nexus.agent' && entry.compatible);
 	expect(executable).toBeDefined();
-	const installed = await installTestPlugin(request, 'nexus.agent');
+	const installed = await installTestPlugin(request, 'nexus.agent', undefined, {
+		selectedRootIds: ['nexus.tools.remote', 'nexus.tools.agent'],
+		uiPackageId: 'nexus.ui.chat',
+	});
 	expect(installed.version).toBe(executable?.version);
 	const app = await enablePluginApp(request, installed.appId);
 	const task = await prepareNativeTask(
@@ -74,8 +77,21 @@ test('remote signed Nexus Agent plugin installs, registers an Agent definition, 
 	);
 	await openNativeTask(task);
 
-	const execute = async (prompt: string, approved: string[] = []) => {
-		const run = await startNativeTask(task, prompt, [connectionId]);
+	const execute = async (prompt: string, approved: string[] = [], throughComposer = false) => {
+		// Keep the initial submission and post-cancellation recovery in the UI.
+		// The App algorithm matrix uses the same real workspace and Run owner.
+		const started = throughComposer
+			? null
+			: await requestAgentWorkspace(request, task.app, {
+					method: 'agent.runs.create',
+					params: {
+						threadId: task.thread.id,
+						operationId: randomUUID(),
+						input: { ...task.input, prompt, connectionIds: [connectionId] },
+					},
+				});
+		if (started !== null && started.method !== 'agent.runs.create') throw new Error('Unexpected Run receipt');
+		const run = started === null ? await startNativeTask(task, prompt, [connectionId]) : started.value.run;
 		try {
 			const result = await finishNativeTask(task, run.id, approved);
 			expect(result.run.status).toBe('completed');
@@ -87,7 +103,7 @@ test('remote signed Nexus Agent plugin installs, registers an Agent definition, 
 
 	await step('signed Skills expose metadata first and exact hash-bound document reads', async () => {
 		for (const name of ['developer', 'operations']) {
-			const result = await execute('E2E_NATIVE_PLUGIN_SKILL ' + name);
+			const result = await execute('E2E_NATIVE_PLUGIN_SKILL ' + name, [], name === 'developer');
 			const report = JSON.parse(result.text);
 			expect(report.marker).toBe('SKILL_OK');
 			const source = await readFile(
@@ -189,7 +205,7 @@ test('remote signed Nexus Agent plugin installs, registers an Agent definition, 
 		// mounted Agent composer. Reopen the same persisted thread so its UI
 		// releases the previous active-Run fence before accepting a new intent.
 		await openNativeTask(task);
-		expect((await execute('E2E_NATIVE_PLUGIN_OK')).text).toBe('OK');
+		expect((await execute('E2E_NATIVE_PLUGIN_OK', [], true)).text).toBe('OK');
 		expect((await readNativeRun(task, run.id)).status).toBe('cancelled');
 	});
 });

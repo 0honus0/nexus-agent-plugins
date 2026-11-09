@@ -37,7 +37,10 @@ test.use({ actionTimeout: 10_000 });
 test('A08 denied deployment cannot execute the proposed SSH mutation', async ({ request, page }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['shell.execute'], [connectionId]);
+	const task = await prepareNativeTask(request, page, ['shell.execute'], [connectionId], undefined, [
+		'nexus.tools.remote',
+		'nexus.tools.agent',
+	]);
 	await openNativeTask(task);
 	const created = await startNativeTask(task, `E2E_BLOCKED_DEPLOY connection=${connectionId}`, [connectionId]);
 	const approval = await waitNativeApproval(task, created.id, 'shell_execute');
@@ -57,12 +60,14 @@ test('A07 browser rejects a stale click, then a separate approved Run deploys on
 	request,
 	page,
 }) => {
-	const task = await prepareNativeTask(request, page, [
-		'browser.read',
-		'browser.interact',
-		'artifacts.read',
-		'artifacts.write',
-	]);
+	const task = await prepareNativeTask(
+		request,
+		page,
+		['browser.read', 'browser.interact', 'artifacts.read', 'artifacts.write'],
+		[],
+		undefined,
+		['nexus.tools.browser', 'nexus.tools.agent'],
+	);
 	const saved = await configureBrowserTargets(request, task.app.id, [
 		{
 			id: 'e2e-deployment',
@@ -139,7 +144,7 @@ test('A06 retired Workspace APIs and environment fields stay rejected while curr
 	request,
 	page,
 }) => {
-	const task = await prepareNativeTask(request, page);
+	const task = await prepareNativeTask(request, page, [], [], undefined, ['nexus.tools.agent']);
 	for (const endpoint of [
 		'/api/v1/agent/workspace-runtime/availability',
 		'/api/v1/agent/workspace-runtime/catalog',
@@ -178,7 +183,12 @@ for (const signedSkill of [false, true]) {
 	}) => {
 		await loginAsInitialAdmin(request);
 		const connectionId = await ensureTestSshConnection(request);
-		const plugin = signedSkill ? await installTestPlugin(request, 'nexus.agent') : null;
+		const plugin = signedSkill
+			? await installTestPlugin(request, 'nexus.agent', undefined, {
+					selectedRootIds: ['nexus.tools.remote', 'nexus.tools.agent'],
+					uiPackageId: 'nexus.ui.chat',
+				})
+			: null;
 		const app = plugin
 			? await requestAgentJson(request, { method: 'GET', path: `/apps/${plugin.appId}` }, readAgentAppResponse)
 			: undefined;
@@ -188,6 +198,7 @@ for (const signedSkill of [false, true]) {
 			signedSkill ? ['shell.execute', 'context.read'] : ['shell.execute'],
 			[connectionId],
 			app,
+			['nexus.tools.remote', 'nexus.tools.agent'],
 		);
 		const portOwner = net.createServer();
 		await new Promise<void>((resolve) => portOwner.listen(0, '127.0.0.1', resolve));
@@ -329,6 +340,8 @@ for (const scenario of [
 			page,
 			['file.read', 'file.write', 'shell.execute'],
 			[connectionId],
+			undefined,
+			['nexus.tools.remote', 'nexus.tools.agent'],
 		);
 		const fixture = path.resolve(import.meta.dirname, '../../fixtures/task-projects', scenario.fixture);
 		const project = path.join(controlledSshRoot, scenario.root);

@@ -70,7 +70,9 @@ for (const width of [320, 390, 1440]) {
 		page,
 	}, testInfo) => {
 		await page.setViewportSize({ width, height: 900 });
-		const task = await prepareNativeTask(request, page, ['artifacts.write', 'artifacts.read']);
+		const task = await prepareNativeTask(request, page, ['artifacts.write', 'artifacts.read'], [], undefined, [
+			'nexus.tools.agent',
+		]);
 		let hub = await openNativeTask(task);
 		const created = await startNativeTask(task, 'E2E_CREATE_DELIVERY');
 		const approval = await waitNativeApproval(task, created.id, 'artifact_create');
@@ -117,7 +119,7 @@ for (const width of [320, 390, 1440]) {
 			mutation: false,
 		});
 		expect(await artifacts(task)).toHaveLength(1);
-		await page.reload();
+		// openNativeTask performs a full navigation and reopens the persisted thread.
 		hub = await openNativeTask(task);
 		await expect(hub.locator('[data-tool-artifact]')).toHaveCount(2);
 		await expect(hub.locator('[data-tool-artifact]').last()).toContainText('report.md');
@@ -131,7 +133,14 @@ for (const file of files) {
 	}) => {
 		await loginAsInitialAdmin(request);
 		const connectionId = await ensureTestSshConnection(request);
-		const task = await prepareNativeTask(request, page, ['file.read', 'artifacts.write'], [connectionId]);
+		const task = await prepareNativeTask(
+			request,
+			page,
+			['file.read', 'artifacts.write'],
+			[connectionId],
+			undefined,
+			['nexus.tools.remote', 'nexus.tools.agent'],
+		);
 		await mkdir(project);
 		await writeFile(path.join(project, file.name), file.bytes);
 		let runId: string | undefined;
@@ -221,7 +230,6 @@ for (const file of files) {
 
 			// Tool-only steps are displayed before the model's next step, including after reload.
 			await expectDeliveryBeforeSummary();
-			await page.reload();
 			await openNativeTask(task);
 			await expect(hub.locator('[data-tool-artifact]')).toHaveAttribute('data-artifact-id', delivered.id);
 			await expectDeliveryBeforeSummary();
@@ -246,7 +254,10 @@ for (const missing of ['file.read', 'artifacts.write', 'selected-target', 'appro
 		await loginAsInitialAdmin(request);
 		const connectionId = await ensureTestSshConnection(request);
 		const grants = (['file.read', 'artifacts.write'] as const).filter((capability) => capability !== missing);
-		const task = await prepareNativeTask(request, page, grants, [connectionId]);
+		const task = await prepareNativeTask(request, page, grants, [connectionId], undefined, [
+			'nexus.tools.remote',
+			'nexus.tools.agent',
+		]);
 		await mkdir(project);
 		await writeFile(path.join(project, 'sentinel.txt'), 'keep');
 		let runId: string | undefined;
@@ -287,7 +298,14 @@ for (const invalid of ['directory', 'symlink']) {
 	test(`SSH delivery rejects a ${invalid} without publishing an Artifact`, async ({ request, page }) => {
 		await loginAsInitialAdmin(request);
 		const connectionId = await ensureTestSshConnection(request);
-		const task = await prepareNativeTask(request, page, ['file.read', 'artifacts.write'], [connectionId]);
+		const task = await prepareNativeTask(
+			request,
+			page,
+			['file.read', 'artifacts.write'],
+			[connectionId],
+			undefined,
+			['nexus.tools.remote', 'nexus.tools.agent'],
+		);
 		await mkdir(project);
 		await writeFile(path.join(project, 'sentinel.txt'), 'keep');
 		if (invalid === 'symlink') await symlink('sentinel.txt', path.join(project, 'entry'));
@@ -327,7 +345,10 @@ for (const invalid of ['directory', 'symlink']) {
 test('cancelled delivery closes a held SSH read and publishes no success card', async ({ request, page }) => {
 	await loginAsInitialAdmin(request);
 	const connectionId = await ensureTestSshConnection(request);
-	const task = await prepareNativeTask(request, page, ['file.read', 'artifacts.write'], [connectionId]);
+	const task = await prepareNativeTask(request, page, ['file.read', 'artifacts.write'], [connectionId], undefined, [
+		'nexus.tools.remote',
+		'nexus.tools.agent',
+	]);
 	await mkdir(project);
 	await writeFile(path.join(project, 'held.bin'), Buffer.alloc(128 * 1024, 0xa5));
 	const hold = E2E_URLS.sshControlOrigin + '/sftp/read-hold';
