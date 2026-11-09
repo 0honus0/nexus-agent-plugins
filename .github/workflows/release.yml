@@ -39,15 +39,8 @@ jobs:
         uses: actions/github-script@v9.0.0
         with:
           script: |
-            const { data } = await github.rest.actions.listWorkflowRuns({
-              ...context.repo, workflow_id: 'validate.yml', head_sha: context.sha,
-              status: 'success', per_page: 1,
-            });
-            const [run] = data.workflow_runs;
-            if (!run || run.head_sha !== context.sha || run.path !== '.github/workflows/validate.yml' ||
-                run.status !== 'completed' || run.conclusion !== 'success') {
-              throw new Error('Complete successful Validate workflow required for this exact source');
-            }
+            const { requireSuccessfulSourceValidation } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/source-validation.mjs`);
+            const run = await requireSuccessfulSourceValidation({ github, ...context.repo, sha: context.sha });
             core.info(`Validated source ${context.sha}: ${run.html_url}`);
       - name: Build and validate selected package
         env:
