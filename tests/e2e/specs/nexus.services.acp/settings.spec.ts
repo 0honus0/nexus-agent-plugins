@@ -178,20 +178,36 @@ test('instance settings preserve credentials, isolate Apps and persist compactio
 		route.fulfill({ status: 503, json: { code: 'provider_unavailable' } }),
 	);
 	await selectAgentExtensionsSection(page, 'market');
-	await page.getByRole('button', { name: 'Refresh repositories', exact: true }).click();
-	const row = page
-		.locator('div.border-b')
-		.filter({ has: page.getByText(app.name, { exact: true }) })
-		.filter({ has: page.getByRole('button', { name: 'Settings', exact: true }) });
+	await page.getByRole('button', { name: 'Manage repositories', exact: true }).click();
+	const repositories = page.getByRole('dialog', { name: 'Manage repositories', exact: true });
+	const refresh = repositories.getByRole('button', { name: 'Refresh repositories', exact: true });
+	await refresh.click();
+	await expect(refresh).toBeEnabled();
+	await repositories.getByRole('button', { name: 'Close', exact: true }).click();
+	const row = page.locator('article[data-app-id="' + app.id + '"]');
 	const catalogError = page
 		.getByRole('alert')
 		.filter({ has: page.getByText('Request failed. Check your session or read again.', { exact: true }) });
 	await catalogError.getByRole('button', { name: 'Close', exact: true }).click();
+	await selectAgentExtensionsSection(page, 'apps');
 	await row.getByRole('button', { name: 'Settings', exact: true }).click();
 	dialog = page.getByRole('dialog', { name: 'Plugin settings', exact: true });
 	await selectUiOption(dialog.getByRole('combobox', { name: 'App using this plugin', exact: true }), app.id);
 	const frame = dialog.frameLocator('iframe[title="Plugin settings"]');
-	await selectUiOption(frame.getByRole('combobox', { name: 'Context compaction', exact: true }), 'aggressive');
+	const compaction = frame.getByRole('combobox', { name: 'Context compaction', exact: true });
+	await compaction.scrollIntoViewIfNeeded();
+	await expect(dialog.getByRole('heading', { name: 'Connection settings', exact: true })).toHaveCount(0);
+	const triggerBounds = await compaction.boundingBox();
+	await compaction.click();
+	const panel = frame.getByRole('listbox');
+	await expect(panel).toBeVisible();
+	const panelBounds = await panel.boundingBox();
+	expect(triggerBounds).not.toBeNull();
+	expect(panelBounds).not.toBeNull();
+	if (!triggerBounds || !panelBounds) throw new Error('Compaction dropdown geometry missing');
+	expect(Math.abs(triggerBounds.x - panelBounds.x)).toBeLessThanOrEqual(1);
+	expect(Math.abs(triggerBounds.width - panelBounds.width)).toBeLessThanOrEqual(1);
+	await frame.getByRole('option', { name: 'Aggressive', exact: true }).click();
 	await frame
 		.getByRole('textbox', { name: 'Additional instructions', exact: true })
 		.fill('Keep this App-specific policy.');
@@ -205,6 +221,7 @@ test('instance settings preserve credentials, isolate Apps and persist compactio
 	await page.reload();
 	await selectAgentExtensionsSection(page, 'market');
 	await catalogError.getByRole('button', { name: 'Close', exact: true }).click();
+	await selectAgentExtensionsSection(page, 'apps');
 	await row.getByRole('button', { name: 'Settings', exact: true }).click();
 	await selectUiOption(dialog.getByRole('combobox', { name: 'App using this plugin', exact: true }), app.id);
 	await expect(frame.getByRole('combobox', { name: 'Context compaction', exact: true })).toHaveAttribute(

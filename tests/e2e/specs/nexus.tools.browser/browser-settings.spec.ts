@@ -28,11 +28,8 @@ test('Browser plugin owns mobile CDP settings and persists only valid instance c
 	);
 	await page.setViewportSize({ width: 320, height: 900 });
 	await page.goto('/settings?tab=agent');
-	await selectAgentExtensionsSection(page, 'market');
-	const row = page
-		.locator('div.border-b')
-		.filter({ has: page.getByText('Browser Tools', { exact: true }) })
-		.filter({ has: page.getByRole('button', { name: 'Settings', exact: true }) });
+	await selectAgentExtensionsSection(page, 'apps');
+	const row = page.getByRole('article', { name: 'Browser Tools', exact: true });
 	await row.getByRole('button', { name: 'Settings', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'Plugin settings', exact: true });
 	const selector = dialog.getByRole('combobox', { name: 'App using this plugin', exact: true });

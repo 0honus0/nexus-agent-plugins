@@ -174,7 +174,7 @@
 </script>
 
 <template>
-	<form class="space-y-5 px-1 py-2" @submit.prevent="save">
+	<form class="space-y-5 px-3 py-2" @submit.prevent="save">
 		<UiLoadingState v-if="loading" compact :title="labels.loading" />
 		<template v-else>
 			<UiInlineNotice v-if="failure" compact tone="warning">{{ labels.failed }}</UiInlineNotice>

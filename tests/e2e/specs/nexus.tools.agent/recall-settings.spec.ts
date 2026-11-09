@@ -28,12 +28,9 @@ test('Recall policy is configured only through the signed Agent tool settings an
 	);
 	await page.setViewportSize({ width: 320, height: 900 });
 	await page.goto('/settings?tab=agent');
-	await selectAgentExtensionsSection(page, 'market');
+	await selectAgentExtensionsSection(page, 'apps');
 	await expect(page.getByRole('tab', { name: 'MCP / ACP', exact: true })).toHaveCount(0);
-	const row = page
-		.locator('div.border-b')
-		.filter({ has: page.getByText('Agent Collaboration and Content Tools', { exact: true }) })
-		.filter({ has: page.getByRole('button', { name: 'Settings', exact: true }) });
+	const row = page.getByRole('article', { name: 'Agent Collaboration and Content Tools', exact: true });
 	await row.getByRole('button', { name: 'Settings', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'Plugin settings', exact: true });
 	const selector = dialog.getByRole('combobox', { name: 'App using this plugin', exact: true });
