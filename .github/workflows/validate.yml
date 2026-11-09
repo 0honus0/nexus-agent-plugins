@@ -171,7 +171,7 @@ jobs:
           artifact-ids: ${{ steps.environment.outputs.result }}
           path: test-artifacts/environment
           merge-multiple: true
-      - name: Pin the same test runner as the successful Host
+      - name: Use latest runner with the successful Host dependency identity
         id: runner
         env:
           HOST_SHA: ${{ steps.host.outputs.sha }}
@@ -180,7 +180,8 @@ jobs:
           import fs from 'node:fs';
           const environment = JSON.parse(fs.readFileSync('../test-artifacts/environment/environment.json', 'utf8'));
           if (environment.sha !== process.env.HOST_SHA ||
-              !/^ghcr\.io\/0honus0\/nexus-terminal-e2e-runner@sha256:[a-f0-9]{64}$/.test(environment.image) ||
+              environment.image !== 'ghcr.io/0honus0/nexus-terminal-e2e-runner:latest' ||
+              !/^sha256:[a-f0-9]{64}$/.test(environment.observedDigest) ||
               !/^[a-f0-9]{64}$/.test(environment.fingerprint)) throw new Error('Invalid successful Host test environment');
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `image=${environment.image}\nfingerprint=${environment.fingerprint}\n`);
           JS
@@ -238,7 +239,7 @@ jobs:
       NEXUS_TEST_HOST_ROOT: ${{ github.workspace }}/host
       NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/shared/candidates/staging-1
       NEXUS_E2E_DATA_ROOT: ${{ github.workspace }}/test-artifacts/browser-backend
-      PINNED_RUNNER_FINGERPRINT: ${{ needs.quality.outputs.runner-fingerprint }}
+      EXPECTED_RUNNER_FINGERPRINT: ${{ needs.quality.outputs.runner-fingerprint }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -271,7 +272,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$(pwd -P)"
           git config --global --add safe.directory "$(realpath ../host)"
-          test "$E2E_RUNNER_FINGERPRINT" = "$PINNED_RUNNER_FINGERPRINT"
+          test "$E2E_RUNNER_FINGERPRINT" = "$EXPECTED_RUNNER_FINGERPRINT"
           (cd ../host && pnpm install --frozen-lockfile --offline)
           tar -xzf ../test-artifacts/shared/plugin-test-source.tar.gz
           pnpm install --frozen-lockfile --prefer-offline
@@ -292,7 +293,7 @@ jobs:
       - name: Record shard resource environment
         if: always()
         env:
-          PINNED_RUNNER_IMAGE: ${{ needs.quality.outputs.runner-image }}
+          RUNNER_IMAGE: ${{ needs.quality.outputs.runner-image }}
           HOST_SHA: ${{ needs.quality.outputs.host-sha }}
           DEPENDENCY_CACHE: ${{ inputs.dependency_cache || 'warm' }}
         run: |
@@ -304,7 +305,7 @@ jobs:
           fs.mkdirSync(root, { recursive: true });
           fs.writeFileSync(root + '/environment.json', JSON.stringify({
             sha: process.env.GITHUB_SHA, hostSha: process.env.HOST_SHA,
-            runnerImage: process.env.PINNED_RUNNER_IMAGE, fingerprint: process.env.E2E_RUNNER_FINGERPRINT,
+            runnerImage: process.env.RUNNER_IMAGE, fingerprint: process.env.E2E_RUNNER_FINGERPRINT, refreshWeek: process.env.E2E_RUNNER_REFRESH_WEEK,
             dependencyCache: process.env.DEPENDENCY_CACHE, node: process.version,
             cpus: os.availableParallelism(), memoryBytes: os.totalmem(),
             cgroupMemoryPeakBytes: read('/sys/fs/cgroup/memory.peak') ?? read('/sys/fs/cgroup/memory/memory.max_usage_in_bytes'),
