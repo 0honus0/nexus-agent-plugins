@@ -1,6 +1,6 @@
 {
   "name": "@nexus-plugins/ui-chat",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "7.3.1",
-    "@nexus-terminal/shared": "file:../../sdk/nexus-terminal-shared-4.0.3.tgz",
+    "@nexus-terminal/shared": "file:../../sdk/nexus-terminal-shared-4.0.5.tgz",
     "@noble/hashes": "2.4.0",
     "@vueuse/core": "15.0.0",
     "axios": "1.21.0",

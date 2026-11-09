@@ -37,6 +37,10 @@ export async function loadCandidateHost() {
 	assert.ok(process.env.NEXUS_TEST_ARTIFACT_DIR, 'NEXUS_TEST_ARTIFACT_DIR must identify this run evidence');
 	const hostRoot = resolve(process.env.NEXUS_TEST_HOST_ROOT);
 	const candidateRoot = resolve(process.env.NEXUS_TEST_PLUGIN_SET);
+	const packageManifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'));
+	const sharedSdk = packageManifest.dependencies['@nexus-terminal/shared'];
+	assert.match(sharedSdk, /^file:sdk\/nexus-terminal-shared-[^/]+\.tgz$/u);
+	const sharedArchive = sharedSdk.slice('file:sdk/'.length);
 	const artifactRoot = resolve(process.env.NEXUS_TEST_ARTIFACT_DIR);
 	await mkdir(artifactRoot, { recursive: true });
 	const origin = JSON.parse(await readFile(join(candidateRoot, 'validation-origin.json'), 'utf8'));
@@ -86,7 +90,7 @@ export async function loadCandidateHost() {
 			},
 			plugins: await sourceIdentity(pluginRoot),
 			sdk: await Promise.all(
-				['backend-v4.mjs', 'frontend-v4.mjs', 'nexus-terminal-shared-4.0.4.tgz'].map(async (file) => ({
+				['backend-v4.mjs', 'frontend-v4.mjs', sharedArchive].map(async (file) => ({
 					file,
 					sha256: sha256(await readFile(join(pluginRoot, 'sdk', file))),
 				})),
