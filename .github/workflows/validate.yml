@@ -85,23 +85,23 @@ jobs:
           package-manager-cache: false
           cache: ${{ inputs.dependency_cache != 'cold' && 'pnpm' || '' }}
           cache-dependency-path: plugins/pnpm-lock.yaml
-      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/install.json" pnpm install --frozen-lockfile
-      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/build.json" pnpm run build
-      - run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/check.json" pnpm run check
-      - name: Run source logic tests
-        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/fast.json" pnpm test:fast
-      - name: Run package and repository tests
+      - name: Install, build and check independent plugin behavior
         run: |
+          echo "::group::Install and build plugins"
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/install.json" pnpm install --frozen-lockfile
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/build.json" pnpm run build
+          echo "::endgroup::"
+          echo "::group::Source checks and independent tests"
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/check.json" pnpm run check
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/fast.json" pnpm test:fast
           mkdir -p "$NEXUS_TEST_ARTIFACT_DIR"
           bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/packages.json" \
             node --test --test-reporter=spec --test-reporter=junit \
             --test-reporter-destination=stdout \
             --test-reporter-destination="$NEXUS_TEST_ARTIFACT_DIR/packages.xml" \
             'plugins/*/tests/**/*.native.test.mjs' 'tests/{repository,templates}/**/*.native.test.mjs'
+          echo "::endgroup::"
 
-      - name: Install Host protocol test dependencies
-        working-directory: host
-        run: bash ../plugins/scripts/measure-command.sh "$NEXUS_TEST_METRICS/host-install.json" pnpm install --frozen-lockfile
       - name: Resolve the immutable successful Host build
         id: build
         uses: actions/github-script@v9.0.0
@@ -123,17 +123,22 @@ jobs:
           artifact-ids: ${{ steps.build.outputs.result }}
           path: host/packages
           merge-multiple: true
-      - name: Verify Host source and exact build fingerprints
-        working-directory: host
+      - name: Prepare Host, sign candidates and check browser sources
         env:
           HOST_SHA: ${{ steps.host.outputs.sha }}
-        run: node scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
-      - name: Sign exact plugin candidates once
-        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/sign.json" pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
-      - name: Check all browser sources and discovery
-        run: bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/browser-check.json" pnpm check:browser
-      - name: Archive compiled plugins without rebuilding in shards
-        run: tar --exclude=node_modules --exclude=.git -czf "$NEXUS_TEST_ARTIFACT_DIR/plugin-test-source.tar.gz" .
+        run: |
+          echo "::group::Install and verify the pinned Host"
+          (
+            cd ../host
+            bash ../plugins/scripts/measure-command.sh "$NEXUS_TEST_METRICS/host-install.json" pnpm install --frozen-lockfile
+            node scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
+          )
+          echo "::endgroup::"
+          echo "::group::Sign candidates and check browser discovery"
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/sign.json" pnpm prepare:interop "$NEXUS_TEST_ARTIFACT_DIR/candidates"
+          bash scripts/measure-command.sh "$NEXUS_TEST_METRICS/browser-check.json" pnpm check:browser
+          tar --exclude=node_modules --exclude=.git -czf "$NEXUS_TEST_ARTIFACT_DIR/plugin-test-source.tar.gz" .
+          echo "::endgroup::"
       - name: Upload one immutable plugin build and candidate set
         id: candidates
         uses: actions/upload-artifact@v7.0.2
@@ -250,15 +255,6 @@ jobs:
           repository: 0honus0/nexus-terminal
           ref: ${{ needs.quality.outputs.host-sha }}
           path: host
-      - name: Register canonical checkout paths
-        run: |
-          git config --global --add safe.directory "$(pwd -P)"
-          git config --global --add safe.directory "$(realpath ../host)"
-      - name: Link Host dependencies from the runner cache
-        working-directory: host
-        run: |
-          test "$E2E_RUNNER_FINGERPRINT" = "$PINNED_RUNNER_FINGERPRINT"
-          pnpm install --frozen-lockfile --offline
       - name: Download the pinned successful Host build
         uses: actions/download-artifact@v8.0.2
         with:
@@ -275,10 +271,14 @@ jobs:
           artifact-ids: ${{ needs.quality.outputs.plugin-artifact-id }}
           path: test-artifacts/shared
           merge-multiple: true
-      - name: Restore and verify exact builds
+      - name: Link cached dependencies, restore and verify exact builds
         env:
           HOST_SHA: ${{ needs.quality.outputs.host-sha }}
         run: |
+          git config --global --add safe.directory "$(pwd -P)"
+          git config --global --add safe.directory "$(realpath ../host)"
+          test "$E2E_RUNNER_FINGERPRINT" = "$PINNED_RUNNER_FINGERPRINT"
+          (cd ../host && pnpm install --frozen-lockfile --offline)
           tar -xzf ../test-artifacts/shared/plugin-test-source.tar.gz
           pnpm install --frozen-lockfile --prefer-offline
           node ../host/scripts/e2e/host-test-artifact.mjs verify "$HOST_SHA"
