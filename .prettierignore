@@ -12,3 +12,6 @@ plugins/nexus.agent/frontend/
 templates/*/backend/
 
 plugins/nexus.tools.*/frontend/
+
+# Generated test evidence stays outside source identity and formatting.
+/test-artifacts/

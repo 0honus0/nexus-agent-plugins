@@ -27,16 +27,17 @@ Each package may contribute multiple purposes. Connection destinations and secre
 
 ## Validate and build
 
+Local development, Validate and publication use the exact Node version in `.node-version`. Interoperability verifies that the selected Host uses the same Node version.
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm run check
 pnpm test
-pnpm --dir plugins/nexus.ui.chat test
 node scripts/check.mjs /path/to/third-party-package
 ```
 
-Each directory under `plugins/` owns its `test` command. `pnpm test` runs repository/signature/composition tests and then every workspace plugin's behavior suite, including Chat UI history and its actual SDK request adapter. The repository check rejects an official plugin without a test entry, and an independent package release reruns that package's tests. Add behavior tests alongside every new plugin; Host integration, signed installation and browser E2E remain separate acceptance gates in Nexus Terminal.
+Each directory under `plugins/` owns its `test` command. `pnpm test` runs repository/signature/composition tests and then every workspace plugin's behavior suite, including Chat UI history and its actual SDK request adapter. The repository check rejects an official plugin without a test entry, and an independent package release reruns that package's tests. Add behavior tests alongside every new plugin; Full Agent interoperability and plugin business browser tests belong to this repository and consume the exact successful Nexus Terminal Host test artifact; generic Host safety remains in Nexus Terminal. See [test ownership and execution](tests/README.md).
 
 `templates/fullstack` demonstrates a model-free App with its own UI and private storage. `templates/project-inspection` demonstrates a workflow App calling selected remote tools. Both build from the same public SDK and remain outside the default product catalog. Copy a template, assign its own package ID and publisher, and use the ordinary validation/signing pipeline.
 
