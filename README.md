@@ -4,7 +4,7 @@ Independent signed packages for [Nexus Terminal](https://github.com/0honus0/nexu
 
 ## SDK and composition
 
-Packages use manifest 4 and public SDK 4. `sdk/nexus-terminal-shared-4.0.4.tgz` supplies compiled contracts, `sdk/backend-v4.mjs` supplies the standalone backend adapter, and UI imports the Host runtime `/sdk/frontend-v4.mjs`. No private Host source or checkout participates in plugin builds. See [SDK distribution](sdk/README.md).
+Packages use manifest 4 and public SDK 4. `sdk/nexus-terminal-shared-4.0.5.tgz` supplies compiled contracts, `sdk/backend-v4.mjs` supplies the standalone backend adapter, and UI imports the Host runtime `/sdk/frontend-v4.mjs`. No private Host source or checkout participates in plugin builds. See [SDK distribution](sdk/README.md).
 
 An App registers one complete asynchronous `run(input, context)` handler through `definePlugin`. It owns model calls, tool discovery, parallelism, context, checkpoints, suspension and completion. The Host does not run fixed phases or assume every App needs a model. `nexus.agent` owns the default chat/image algorithm; its optional tools and UI are selected by the user, rather than frozen into App code dependencies.
 
@@ -58,3 +58,7 @@ Archives sign the original manifest and file hashes under `NEXUS_AGENT_PLUGIN_V4
 5. Publish the new catalog after verification. A compatible tool, service or UI update does not require a new App or Host build. New privileged Host capabilities still require Host support.
 
 For local acceptance, `node scripts/build-staging.mjs <artifact-directory> <development-private-key.pem> --include-inspection --base-url http://127.0.0.1:3003/` creates a new, explicitly unofficial staging generation with immutable prerelease archives. Do not publish a development key or describe this as an official release. Source/build, package tests, actual Host installation and browser acceptance are separate evidence.
+
+## Required plugins on Agent enable
+
+A signed manifest may opt in with `requiredOnEnable: true`; absence or false means optional. Catalog generation copies this field from the verified archive and rejects descriptor tampering. Nexus Agent and Nexus Chat UI opt in; tools and protocol providers remain optional. The Host discovers the complete trusted required set without package-ID rules, prepares all packages, reuses existing installations and composes Apps/UI before enabling Agent. Existing App grants and enabled states are preserved. Required metadata is not a code dependency or execution authorization; use contribution contracts and real dependency declarations for those relationships.

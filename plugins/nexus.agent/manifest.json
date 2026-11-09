@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "id": "nexus.agent",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "displayName": "Nexus Agent",
   "capabilities": [
     "file.read",
@@ -68,5 +68,6 @@
     ]
   },
   "dependencies": [],
-  "namespaces": ["nexus.agent", "nexus.app"]
+  "namespaces": ["nexus.agent", "nexus.app"],
+  "requiredOnEnable": true
 }

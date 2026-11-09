@@ -236,6 +236,7 @@ export function catalogEntry(manifest, publisherKeyId, archiveHash, sizeBytes, p
 		version: manifest.version,
 		compatibility: manifest.compatibility,
 		contributionKinds: contributionKinds(manifest),
+		requiredOnEnable: manifest.requiredOnEnable,
 		displayName: manifest.displayName,
 		description: `Nexus plugin: ${manifest.displayName}.`,
 		packageUrl,
@@ -277,6 +278,7 @@ function releaseIdentity(entry) {
 		version: entry.version,
 		compatibility: entry.compatibility,
 		contributionKinds: entry.contributionKinds,
+		requiredOnEnable: entry.requiredOnEnable,
 		packageUrl: entry.packageUrl,
 		sha256: entry.sha256,
 		sizeBytes: entry.sizeBytes,
@@ -319,6 +321,7 @@ export function readReleaseArtifact(releasePath) {
 				version: expected.version,
 				compatibility: expected.compatibility,
 				contributionKinds: expected.contributionKinds,
+				requiredOnEnable: expected.requiredOnEnable,
 				displayName: artifact.displayName,
 				description: artifact.description,
 				localizations: artifact.localizations?.map((item) => ({

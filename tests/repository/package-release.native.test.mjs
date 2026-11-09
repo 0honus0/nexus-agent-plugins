@@ -30,6 +30,7 @@ test('third-party template uses the shared contract, V4 signature, immutable rel
 		const manifestPath = path.join(source, 'manifest.json');
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 		manifest.id = 'example.thirdparty';
+		manifest.requiredOnEnable = true;
 		manifest.displayName = 'Independent Third Party';
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 		run('check.mjs', source);
@@ -58,6 +59,7 @@ test('third-party template uses the shared contract, V4 signature, immutable rel
 		const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 		assert.equal(catalog.schemaVersion, 2);
 		assert.equal(catalog.packages.length, 2);
+		assert.ok(catalog.packages.every((entry) => entry.requiredOnEnable === true));
 		assert.equal(catalog.packages[0].sha256, sha256(original));
 		assert.equal(
 			catalog.packages[0].localizations,
@@ -89,6 +91,15 @@ test('third-party template uses the shared contract, V4 signature, immutable rel
 				}),
 			);
 		}
+		const requirementTampered = JSON.parse(fs.readFileSync(second.releasePath, 'utf8'));
+		const originalDescriptor = fs.readFileSync(second.releasePath);
+		requirementTampered.package.requiredOnEnable = false;
+		fs.writeFileSync(second.releasePath, JSON.stringify(requirementTampered));
+		assert.throws(
+			() => run('build-catalog-release.mjs', path.join(temp, 'wrong-requirement.json'), second.releasePath),
+			/Command failed/,
+		);
+		fs.writeFileSync(second.releasePath, originalDescriptor);
 		const tampered = JSON.parse(fs.readFileSync(second.releasePath, 'utf8'));
 		tampered.package.compatibility.host.minVersion = '1.0.0';
 		fs.writeFileSync(second.releasePath, JSON.stringify(tampered));

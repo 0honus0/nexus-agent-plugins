@@ -83,6 +83,7 @@ const index = readAgentPluginCatalogIndex({
 			version: entry.version,
 			compatibility: entry.compatibility,
 			contributionKinds: entry.contributionKinds,
+			requiredOnEnable: entry.requiredOnEnable,
 			displayName: entry.displayName,
 			description: translations?.find((item) => item.locale === 'en-US')?.description ?? entry.description,
 			localizations: translations ?? entry.localizations,
