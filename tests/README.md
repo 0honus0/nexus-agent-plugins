@@ -34,3 +34,5 @@ Browser fixtures declare the smallest real plugin composition needed by each sce
 独立Validate将相邻安装/构建/检查及候选签包/浏览器类型合并为日志分组步骤，每条命令仍保留资源测量；分片共用一次依赖链接与成品校验。互操作与浏览器仍分开运行，保留互操作失败后继续执行浏览器的诊断行为，八分片与准确Host源码、不可变成品及runner身份不变。
 
 浏览器WebServer沿用准确Host配置，完整stdout/stderr进入本轮`webserver/{backend,frontend}/run-*/output.log`并随分片报告上传，控制台保留测试步骤/结果与失败摘要；不降低应用日志等级，不改变关闭与失败语义。
+
+Shard steps set `NEXUS_TEST_LOG_DIR` to retain complete command stdout/stderr in `logs/<phase>.log`, uploaded with the existing reports. The console prints stage start, elapsed time, result and log location; full testcase reports and failure/cancellation semantics are unchanged. The quality job keeps ordinary output.

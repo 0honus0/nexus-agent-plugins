@@ -241,6 +241,7 @@ jobs:
         working-directory: plugins
     env:
       NEXUS_TEST_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts/layers
+      NEXUS_TEST_LOG_DIR: ${{ github.workspace }}/test-artifacts/layers/logs
       NEXUS_TEST_HOST_ROOT: ${{ github.workspace }}/host
       NEXUS_TEST_PLUGIN_SET: ${{ github.workspace }}/test-artifacts/shared/candidates/staging-1
       NEXUS_E2E_DATA_ROOT: ${{ github.workspace }}/test-artifacts/browser-backend
@@ -324,6 +325,7 @@ jobs:
           name: plugin-tests-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             test-artifacts/layers/metrics/*
+            test-artifacts/layers/logs/*.log
             test-artifacts/layers/reports/*
             test-artifacts/layers/*combination*.json
             test-artifacts/layers/browser/report.json
