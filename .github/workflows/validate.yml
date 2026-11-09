@@ -327,6 +327,7 @@ jobs:
             test-artifacts/layers/reports/*
             test-artifacts/layers/*combination*.json
             test-artifacts/layers/browser/report.json
+            test-artifacts/layers/**/webserver/**/*.log
             test-artifacts/**/timings.json
           if-no-files-found: error
           retention-days: 14

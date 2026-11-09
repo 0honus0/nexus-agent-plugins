@@ -32,3 +32,5 @@ Validate pins an immutable runner digest for all eight shards. Dispatch `depende
 Browser fixtures declare the smallest real plugin composition needed by each scenario. ChatUI remains installed where rendering is asserted; protocol-only Host tests need no UI package. The initial composer submission and post-cancellation recovery stay in the real UI, while repeated App algorithm matrices may submit through the same real workspace API with independent operation IDs. A helper that already performs full navigation does not require an extra reload first. Full file bytes, GIF decoding, directory depth, grants, approvals, process cleanup and persistence assertions stay unchanged.
 
 独立Validate将相邻安装/构建/检查及候选签包/浏览器类型合并为日志分组步骤，每条命令仍保留资源测量；分片共用一次依赖链接与成品校验。互操作与浏览器仍分开运行，保留互操作失败后继续执行浏览器的诊断行为，八分片与准确Host源码、不可变成品及runner身份不变。
+
+浏览器WebServer沿用准确Host配置，完整stdout/stderr进入本轮`webserver/{backend,frontend}/run-*/output.log`并随分片报告上传，控制台保留测试步骤/结果与失败摘要；不降低应用日志等级，不改变关闭与失败语义。
