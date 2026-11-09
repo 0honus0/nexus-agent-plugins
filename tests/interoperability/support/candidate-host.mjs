@@ -27,7 +27,7 @@ async function sourceIdentity(root) {
 			hashes.push({ path, deleted: true });
 		}
 	}
-	return { commit: git('rev-parse', 'HEAD').trim(), filesSha256: sha256(JSON.stringify(hashes)) };
+	return { commit: git('rev-parse', 'HEAD').trim(), filesSha256: sha256(JSON.stringify(hashes)), files: hashes };
 }
 
 /** Candidates are exact output archives; Host performs its normal signature/package validation. */
