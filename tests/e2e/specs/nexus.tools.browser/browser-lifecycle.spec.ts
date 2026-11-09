@@ -49,10 +49,8 @@ test('Nexus Agent Browser lifecycle cases reclaim contexts across cancellation a
 	await openNativeTask(task);
 	for (const phase of ['cancel-creating', 'complete', 'cancel-live', 'repeat', 'cancel-approval', 'approve']) {
 		await step(`Root Browser cleanup: ${phase}`, async () => {
-			// The prior Run is terminated by the separately authenticated API
-			// owner. Re-read the same persisted thread before composing a new Run;
-			// an already-mounted composer can still display the old active fence.
-			await openNativeTask(task);
+			// Exercise real chat submission once; subsequent resource-lifecycle
+			// cases use the same App boundary without reconstructing its iframe.
 			const creating = phase === 'cancel-creating';
 			const approval = phase === 'cancel-approval' || phase === 'approve';
 			const cancel = phase.startsWith('cancel-');
@@ -60,11 +58,20 @@ test('Nexus Agent Browser lifecycle cases reclaim contexts across cancellation a
 			if (creating) {
 				await browserControl('/creation-barrier', 'POST');
 			}
-			const run = await startNativeTask(
-				task,
-				`E2E_BROWSER_LIFECYCLE ${randomUUID()} version=${browser.version}${approval ? ' E2E_BROWSER_APPROVAL=' + connectionId : ''}`,
-				[connectionId],
-			);
+			const prompt = `E2E_BROWSER_LIFECYCLE ${randomUUID()} version=${browser.version}${approval ? ' E2E_BROWSER_APPROVAL=' + connectionId : ''}`;
+			const run = await (async () => {
+				if (creating) return startNativeTask(task, prompt, [connectionId]);
+				const started = await requestAgentWorkspace(request, app, {
+					method: 'agent.runs.create',
+					params: {
+						threadId: task.thread.id,
+						operationId: randomUUID(),
+						input: { ...task.input, prompt, connectionIds: [connectionId] },
+					},
+				});
+				if (started.method !== 'agent.runs.create') throw new Error('Unexpected Run creation receipt');
+				return started.value.run;
+			})();
 			try {
 				try {
 					const open = await waitNativeApproval(task, run.id, 'browser_open');

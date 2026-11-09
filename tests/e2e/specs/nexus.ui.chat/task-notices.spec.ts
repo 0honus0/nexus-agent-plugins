@@ -22,6 +22,7 @@ for (const width of [1280, 390, 320]) {
 			page,
 			request,
 		}) => {
+			await page.clock.install();
 			await loginAsInitialAdmin(request);
 			const connectionId = await ensureTestSshConnection(request);
 			const prepared = await prepareNativeTask(request, page, ['shell.execute'], [connectionId]);
@@ -63,13 +64,18 @@ for (const width of [1280, 390, 320]) {
 					notice.getByRole('button', { name: 'Approve and run', exact: true }).click(),
 				);
 				expect(receipt.result.method).toBe('agent.approvals.resolve');
-				await expect.poll(async () => (await readNativeRun(prepared, run.id)).status).toBe('completed');
+				await expect
+					.poll(async () => (await readNativeRun(prepared, run.id)).status, { intervals: [20, 50, 100] })
+					.toBe('completed');
 				await expect(notice.getByText('Task completed', { exact: true })).toBeVisible();
 				await expect(notice.getByText('NOTICE_COMPLETED', { exact: true })).toBeVisible();
 				await expect(page.getByRole('img', { name: '1 pending approvals', exact: true })).toHaveCount(0);
 				await launcher.focus();
 				await page.mouse.move(0, 0);
-				await expect(notice).toHaveCount(0, { timeout: 12_000 });
+				// The notice timer belongs to the browser. Keep the real Run and
+				// approval journey, then advance its clock instead of sleeping 8s.
+				await page.clock.fastForward(8000);
+				await expect(notice).toHaveCount(0);
 				await expect(launcher).toBeFocused();
 				await launcher.press('Enter');
 				await expect(hub).toBeVisible();

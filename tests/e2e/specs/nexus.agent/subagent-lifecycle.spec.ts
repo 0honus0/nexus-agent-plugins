@@ -85,10 +85,9 @@ test('Nexus Agent subagent lifecycle preserves tool batches and reclaims child B
 	});
 	for (const phase of ['complete', 'cancel-live', 'cancel-creating', 'child-cancel-live', 'child-cancel-creating']) {
 		await step(`Child Browser resources settle: ${phase}`, async () => {
-			// Refresh the authoritative same-thread view after the previous child
-			// Run finished through the API. The mounted composer may otherwise
-			// remain disabled against the retired active-run fence.
-			await openNativeTask(task);
+			// The successful UI submission is covered above. This matrix checks
+			// Child/CDP lifecycle through the actual App workspace boundary;
+			// rebuilding the chat iframe adds no resource-lifecycle assertion.
 			const independent = phase.startsWith('child-');
 			const creating = phase.endsWith('creating');
 			const cancelled = phase !== 'complete';
@@ -96,10 +95,19 @@ test('Nexus Agent subagent lifecycle preserves tool batches and reclaims child B
 			if (creating) {
 				await browserControl('/creation-barrier', 'POST');
 			}
-			const run = await startNativeTask(
-				task,
-				`E2E_NATIVE_PLUGIN_DELEGATE browser=true version=${browser.version}`,
-			);
+			const started = await requestAgentWorkspace(request, app, {
+				method: 'agent.runs.create',
+				params: {
+					threadId: task.thread.id,
+					operationId: randomUUID(),
+					input: {
+						...task.input,
+						prompt: `E2E_NATIVE_PLUGIN_DELEGATE browser=true version=${browser.version}`,
+					},
+				},
+			});
+			if (started.method !== 'agent.runs.create') throw new Error('Unexpected Run creation receipt');
+			const run = started.value.run;
 			try {
 				try {
 					await expect
@@ -111,7 +119,7 @@ test('Nexus Agent subagent lifecycle preserves tool batches and reclaims child B
 									: (await (await fetch(E2E_URLS.openAiProviderOrigin + '/browser-lifecycle')).json())
 											.held;
 							},
-							{ timeout: 20_000 },
+							{ timeout: 20_000, intervals: [20, 50, 100] },
 						)
 						.toBe(true);
 					await expect
