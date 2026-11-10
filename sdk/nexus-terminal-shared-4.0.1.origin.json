@@ -1,9 +1,0 @@
-{
-  "package": "@nexus-terminal/shared",
-  "version": "4.0.1",
-  "archive": "nexus-terminal-shared-4.0.1.tgz",
-  "sha256": "48f9b8e12bbc47efcf319639e2739bcf5ef2fb9e30094f33e9b80dd3f193fb74",
-  "sourceOwner": "nexus-terminal/packages/shared",
-  "sourceFilesSha256": "8ab77b6c529cff491de63dcbd92492f685bb6d7e65ff5757d39f59e8cc63ee2a",
-  "compiledFilesSha256": "8ae7d34861bf8bf82a39fe59dee7020d080029588b16ff72b16928515218a503"
-}
