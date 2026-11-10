@@ -97,14 +97,17 @@
 		void editor.remove(item);
 	}
 
-	async function createThread(): Promise<void> {
+	async function createThread(): Promise<NativeThread | null> {
 		if (!canCreate.value) {
-			return;
+			return null;
 		}
 		editor.newThread();
 		title.value = t('agent.operations.untitledThread');
 		await editor.submit(false, true);
+		return props.active && !pending.value ? selected.value : null;
 	}
+
+	defineExpose({ createThread });
 
 	async function retryPending(): Promise<void> {
 		await editor.submit(true);

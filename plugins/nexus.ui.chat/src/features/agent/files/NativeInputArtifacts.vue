@@ -13,7 +13,7 @@
 	const props = defineProps<{
 		appId: string;
 		appNames?: Record<string, string>;
-		threadId: string;
+		threadId: string | null;
 		active: boolean;
 		disabled: boolean;
 	}>();
@@ -56,7 +56,9 @@
 
 	const operation = useAgentManagementOperation(revoke, () => props.active, { retainOnView: true });
 
-	const locked = computed(() => props.disabled || operation.busy.value || choosing.value || unknown.value);
+	const locked = computed(
+		() => props.threadId === null || props.disabled || operation.busy.value || choosing.value || unknown.value,
+	);
 	const needsAttention = computed(
 		() =>
 			unknown.value ||
@@ -117,7 +119,8 @@
 	}
 
 	async function prepare(): Promise<void> {
-		if (locked.value || operation.refreshRequired.value || !items.value.length) return;
+		const threadId = props.threadId;
+		if (threadId === null || locked.value || operation.refreshRequired.value || !items.value.length) return;
 		const originals = items.value;
 		unknown.value = true;
 		emit('ready', false, []);
@@ -128,7 +131,7 @@
 					// An explicit attachment precedes Run creation; it never grants artifacts.read.
 					if (signal.aborted) throw new AgentManagementFailure('cancelled', 'not_dispatched');
 					const result = await platform.request(
-						{ kind: 'artifact.selection.attach', key: item.key, threadId: props.threadId },
+						{ kind: 'artifact.selection.attach', key: item.key, threadId },
 						signal,
 					);
 					if (result.kind !== 'artifact.selection.attach' || result.selection.id !== item.id)

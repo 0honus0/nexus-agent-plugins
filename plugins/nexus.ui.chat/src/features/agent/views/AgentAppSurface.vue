@@ -103,6 +103,16 @@
 		if (transcriptFrame !== null) cancelAnimationFrame(transcriptFrame);
 	});
 
+	const threadPanel = ref<InstanceType<typeof NativeThreadPanel> | null>(null);
+	const startingConversation = ref(false);
+	let composerGeneration = 0;
+	watch(
+		() => [props.active, props.appVersion],
+		() => {
+			composerGeneration += 1;
+		},
+		{ flush: 'sync' },
+	);
 	const threadBusy = ref(false);
 	const bindingBusy = ref(false);
 	const runtime = useNativeRuns(
@@ -502,10 +512,10 @@
 	const sendDisabled = computed(
 		() =>
 			blocked.value ||
+			startingConversation.value ||
 			!props.executionEnabled ||
 			!attachmentsReady.value ||
 			!scope.value ||
-			!thread.value ||
 			!selectedModel.value ||
 			!draft.value.trim() ||
 			runNeedsClosure.value,
@@ -513,7 +523,14 @@
 
 	async function applyThreadSelection(): Promise<void> {
 		const value = pendingThreadSelection.value;
-		if (!value || !scope.value || operation.busy.value || pending.value !== null || !attachmentsReady.value) {
+		if (
+			startingConversation.value ||
+			!value ||
+			!scope.value ||
+			operation.busy.value ||
+			pending.value !== null ||
+			!attachmentsReady.value
+		) {
 			return;
 		}
 		pendingThreadSelection.value = null;
@@ -695,12 +712,31 @@
 		},
 	);
 
-	function submitComposer(): void {
-		if (!thread.value || runNeedsClosure.value) {
-			return;
+	async function submitComposer(): Promise<void> {
+		if (sendDisabled.value || !props.active) return;
+		const generation = composerGeneration;
+		startingConversation.value = true;
+		try {
+			if (!thread.value) {
+				const created = await threadPanel.value?.createThread();
+				if (!created || disposed || !props.active || generation !== composerGeneration) return;
+				pendingThreadSelection.value = null;
+				await runtime.selectThread(created);
+				if (
+					disposed ||
+					!props.active ||
+					generation !== composerGeneration ||
+					runtime.thread.value?.id !== created.id
+				)
+					return;
+			}
+			if (blocked.value || runNeedsClosure.value) return;
+			keepPinnedToBottom.value = true;
+			await runtime.send(run.value !== null);
+		} finally {
+			startingConversation.value = false;
+			if (!disposed && props.active) void applyThreadSelection();
 		}
-		keepPinnedToBottom.value = true;
-		void runtime.send(run.value !== null);
 	}
 
 	function stopRun(): void {
@@ -712,8 +748,8 @@
 	function selectNativeThread(value: NativeThread | null, origin: 'automatic' | 'interaction'): void {
 		if (origin === 'interaction') threadDrawerOpen.value = false;
 		pendingThreadSelection.value = value;
-		if (value) void applyThreadSelection();
-		else runtime.clearThread();
+		if (value && !startingConversation.value) void applyThreadSelection();
+		else if (!value) runtime.clearThread();
 	}
 
 	watch(
@@ -837,13 +873,16 @@
 			:inert="threadsOverlay ? !threadDrawerOpen : !threadSidebarVisible"
 		>
 			<NativeThreadPanel
+				ref="threadPanel"
 				:app-id="appId"
 				:app-version="appVersion"
 				:restore-thread-id="readChatCheckpoint(platform.environment.value.checkpoint)?.threadId"
 				:live-thread="thread"
 				:active="active"
 				:resume-revision="resumeRevision"
-				:disabled="operation.busy.value || bindingBusy || !!pending || !attachmentsReady"
+				:disabled="
+					startingConversation || operation.busy.value || bindingBusy || !!pending || !attachmentsReady
+				"
 				auto-load
 				@select="selectNativeThread"
 				@removed="forgetNativeThread"
@@ -978,9 +1017,9 @@
 					:title="t('agent.operations.loading')"
 				/>
 				<!-- No gap above the composer: the entire floating status row must overlay the scroller. -->
-				<section v-if="thread" class="flex min-h-0 flex-1 flex-col">
+				<section v-if="thread || scope" class="flex min-h-0 flex-1 flex-col">
 					<DynamicScroller
-						:key="thread.id"
+						:key="thread?.id ?? 'draft'"
 						ref="transcript"
 						:items="transcriptRows"
 						key-field="id"
@@ -1204,7 +1243,7 @@
 									rows="3"
 									data-no-highlight
 									class="max-h-48 min-h-24 w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-text-secondary/50"
-									:disabled="blocked || !thread"
+									:disabled="blocked || startingConversation"
 									:aria-label="t('agent.nativeRun.prompt')"
 									:placeholder="t('agent.conversation.placeholder')"
 									@keydown="handleComposerKeydown"
@@ -1597,10 +1636,10 @@
 									<div class="agent-composer-actions ml-auto flex shrink-0 items-center gap-1.5">
 										<NativeInputArtifacts
 											ref="attachmentControl"
-											:key="thread.id"
+											:key="thread?.id ?? 'draft'"
 											:app-id="appId"
 											:app-names="appNames"
-											:thread-id="thread.id"
+											:thread-id="thread?.id ?? null"
 											:active="active"
 											:disabled="blocked"
 											@working="bindingBusy = $event"

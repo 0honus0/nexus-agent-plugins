@@ -7,6 +7,9 @@ import type { AgentWorkspaceRequest } from '@nexus-shared/agent/scope/workspace-
 import {
 	openAgentConversations,
 	openAgentHub,
+	prepareAgentRun,
+	selectAgentApp,
+	selectAgentModel,
 	createTestAgentApp,
 	enableTestAgentExecution,
 	requestAgentWorkspace,
@@ -223,5 +226,84 @@ test('Agent tabs own independent local drafts and observe external threads throu
 		expect(sockets).toBe(0);
 	} finally {
 		await follower.close();
+	}
+});
+
+test('empty Agent chat creates one thread on first send and retains the draft after a rejected creation', async ({
+	page,
+	context,
+}) => {
+	await loginAsInitialAdmin(context.request);
+	await setUiLanguage(context.request);
+	const prepared = await prepareAgentRun(context.request);
+	await requestAgentWorkspace(context.request, prepared.app, {
+		method: 'agent.threads.delete',
+		params: { threadId: prepared.thread.id, expectedVersion: prepared.thread.version },
+	});
+	const commands: AgentWorkspaceRequest['request'][] = [];
+	const gate = Promise.withResolvers<void>();
+	let creates = 0;
+	const rpcPath = `**/api/v1/agent/plugins/installations/${prepared.app.id}/frontend/rpc`;
+	await page.route(rpcPath, async (route) => {
+		const { envelope } = readAgentPluginFrontendRpc(route.request().postDataJSON());
+		const command = envelope.request;
+		if (command.method === 'agent.threads.create') {
+			commands.push(command);
+			creates += 1;
+			if (creates === 1) {
+				await route.fulfill({
+					status: 200,
+					json: {
+						type: 'nexus.plugin.response',
+						protocol: 4,
+						nonce: envelope.nonce,
+						id: envelope.id,
+						seq: envelope.seq,
+						ok: false,
+						error: { code: 'invalid_input' },
+					},
+				});
+				return;
+			}
+			await gate.promise;
+		} else if (command.method === 'agent.runs.create') commands.push(command);
+		await route.continue();
+	});
+	try {
+		await page.goto('/connections');
+		await openAgentHub(page);
+		await selectAgentApp(page, prepared.app);
+		const hub = agentChatSurface(page, prepared.app.id);
+		const composer = hub.getByRole('textbox', { name: 'Task input', exact: true });
+		await expect(composer).toBeEnabled();
+		expect(creates).toBe(0);
+		await selectAgentModel(page, prepared.provider);
+		await composer.fill('Reply OK without using tools.');
+		const send = hub.locator('.agent-send-button');
+		await send.click();
+		await expect.poll(() => creates).toBe(1);
+		await expect(composer).toBeEnabled();
+		await expect(composer).toHaveValue('Reply OK without using tools.');
+		expect(commands.filter((item) => item.method === 'agent.runs.create')).toHaveLength(0);
+		await send.click();
+		await expect.poll(() => creates).toBe(2);
+		await expect(send).toBeDisabled();
+		await hub.locator('form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+		expect(creates).toBe(2);
+		gate.resolve();
+		await expect(composer).toHaveValue('');
+		await expect.poll(() => commands.filter((item) => item.method === 'agent.runs.create').length).toBe(1);
+		const threads = await requestAgentWorkspace(context.request, prepared.app, {
+			method: 'agent.threads.list',
+			params: { after: null, limit: 20 },
+		});
+		if (threads.method !== 'agent.threads.list') throw new Error('Unexpected thread list');
+		expect(threads.value.items).toHaveLength(1);
+		const create = commands.findLast((item) => item.method === 'agent.threads.create');
+		if (create?.method !== 'agent.threads.create') throw new Error('Missing create command');
+		expect(create.params.autoTitle).toBe(true);
+	} finally {
+		gate.resolve();
+		await page.unroute(rpcPath, { behavior: 'wait' });
 	}
 });
