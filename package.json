@@ -1,5 +1,5 @@
 {
-  "name": "nexus-agent-plugins",
+  "name": "nexus-plugin",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.18.0",

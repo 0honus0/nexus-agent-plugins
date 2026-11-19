@@ -18,15 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: home/nexus-agent-plugins
+          path: home/nexus-plugin
           fetch-depth: 0
           persist-credentials: false
       - name: Verify tagged commit is on main
-        working-directory: home/nexus-agent-plugins
+        working-directory: home/nexus-plugin
         run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
-      - uses: ./home/nexus-agent-plugins/.github/actions/setup
+      - uses: ./home/nexus-plugin/.github/actions/setup
       - name: Test and pack tagged plugin
-        working-directory: home/nexus-agent-plugins
+        working-directory: home/nexus-plugin
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |

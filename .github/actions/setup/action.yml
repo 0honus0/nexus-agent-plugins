@@ -13,12 +13,12 @@ runs:
         persist-credentials: false
     - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       with:
-        package_json_file: home/nexus-agent-plugins/package.json
+        package_json_file: home/nexus-plugin/package.json
     - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: '26.13.1'
         cache: pnpm
-        cache-dependency-path: home/nexus-agent-plugins/pnpm-lock.yaml
+        cache-dependency-path: home/nexus-plugin/pnpm-lock.yaml
     - run: pnpm install --frozen-lockfile
       shell: bash
-      working-directory: home/nexus-agent-plugins
+      working-directory: home/nexus-plugin
