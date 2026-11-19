@@ -41,7 +41,7 @@
         },
         "distributions": [
           {
-            "tarball": "https://github.com/0honus0/nexus-agent-plugins/releases/download/ssh/v0.0.1-dev.1/ssh-0.0.1-dev.1.tgz",
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/ssh/v0.0.1-dev.1/ssh-0.0.1-dev.1.tgz",
             "integrity": "sha512-npAlxp9gp+mUQFDjXgivJZLZxfuidV/5eskrDzkQn20/uzGsReD8RrM2CVM2wkwS1YZqNWnwEpONYgz9QWmRsA=="
           }
         ]
