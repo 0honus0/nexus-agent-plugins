@@ -17,7 +17,7 @@ import provider from './fixtures/provider/package.json' with { type: 'json' };
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const defaultImage =
-	'ghcr.io/0honus0/nexus-terminal@sha256:96bd6a2b5dfa18a21651a356f7105fb0d27446799882d31632d63f34d67e13ba';
+	'ghcr.io/0honus0/nexus-terminal@sha256:d169a2852d75ea4ee184f5787163be365de95dafd6b2b1e2ae36bc79e104a440';
 
 export const market = '/api/plugins/' + encodeURIComponent('@nexus-terminal/marketplace');
 
@@ -31,11 +31,34 @@ export const backupPath = '/api/plugins/' + encodeURIComponent('@nexus-terminal/
 
 const OperationSchema = z.object({ id: z.string(), state: z.string(), finishedAt: z.string().optional() });
 
-async function pack(root: string, files: string) {
-	await exec('pnpm', ['--dir', root, 'pack', '--pack-destination', files], { timeout: 15000 });
-	const [name] = await readdir(files);
-	assert.ok(name);
-	const archive = join(files, name);
+interface Fixture {
+	readonly directory: string;
+	readonly archive?: string;
+}
+
+interface FixtureManifest {
+	readonly name: string;
+	readonly version: string;
+	readonly nexus: { readonly entry: Record<string, string> };
+}
+
+export function pluginFixture(directory: URL, id: string): Fixture {
+	const candidates = JSON.parse(process.env.NEXUS_TEST_PLUGIN_ARTIFACTS ?? '{}') as Record<
+		string,
+		string | undefined
+	>;
+	return { directory: fileURLToPath(directory), archive: candidates[id] };
+}
+
+async function pack(fixture: Fixture, files: string, manifest: FixtureManifest) {
+	let archive = fixture.archive;
+	if (!archive) {
+		await exec('pnpm', ['--dir', fixture.directory, 'pack', '--pack-destination', files], { timeout: 15000 });
+		const [name] = await readdir(files);
+		assert.ok(name);
+		archive = join(files, name);
+	}
+
 	const entries: string[] = [];
 	await list({
 		file: archive,
@@ -44,14 +67,10 @@ async function pack(root: string, files: string) {
 			entries.push(entry.path);
 		},
 	});
-	assert.ok(entries.includes('package/dist/browser/index.js'));
-	assert.ok(entries.includes('package/dist/node/index.js'));
+	for (const entry of Object.values(manifest.nexus.entry)) assert.ok(entries.includes('package/' + entry));
 	assert.ok(
 		entries.every(
-			(path) =>
-				path === 'package/package.json' ||
-				path === 'package/README.md' ||
-				/^package\/dist\/(?:node|browser)\//u.test(path),
+			(path) => path === 'package/package.json' || path === 'package/README.md' || /^package\/dist\//u.test(path),
 		),
 	);
 	return readFile(archive);
@@ -67,16 +86,28 @@ export async function until<Value>(read: () => Promise<Value | undefined>): Prom
 	}
 }
 
-export async function startHost(resources: AsyncDisposableStack) {
+export async function startHost(
+	resources: AsyncDisposableStack,
+	target = plugin.name,
+	fixtures: readonly Fixture[] = [{ directory: root }, { directory: join(root, 'tests/fixtures/provider') }],
+) {
 	const fixtureToken = randomUUID();
 	const working = await mkdtemp(join(tmpdir(), 'nexus-external-sdk-'));
 	resources.defer(() => rm(working, { recursive: true, force: true }));
-	const shared = await mkdtemp(join(working, 'provider-'));
-	const app = await mkdtemp(join(working, 'application-'));
-	const archives = new Map([
-		['/app.tgz', await pack(root, app)],
-		['/provider.tgz', await pack(join(root, 'tests/fixtures/provider'), shared)],
-	]);
+	const archives = new Map<string, Buffer>();
+	const packages = await Promise.all(
+		fixtures.map(async (fixture, index) => {
+			const directory = await mkdtemp(join(working, 'package-'));
+			const manifest = JSON.parse(
+				await readFile(join(fixture.directory, 'package.json'), 'utf8'),
+			) as FixtureManifest;
+			const endpoint = `/package-${index}.tgz`;
+			archives.set(endpoint, await pack(fixture, directory, manifest));
+			return [manifest, endpoint] as const;
+		}),
+	);
+	const targetPackage = packages.find(([manifest]) => manifest.name === target)?.[0];
+	assert.ok(targetPackage);
 
 	let catalog: unknown;
 	const repository = createServer((request, response) => {
@@ -95,10 +126,7 @@ export async function startHost(resources: AsyncDisposableStack) {
 	const address = repository.address();
 	assert.ok(address && typeof address !== 'string');
 	const remote = 'http://sdk-repository.test:' + address.port;
-	const packages = [
-		[plugin, '/app.tgz'],
-		[provider, '/provider.tgz'],
-	] as const;
+
 	catalog = packages.map(([manifest, path]) => ({
 		id: manifest.name,
 		versions: [
@@ -191,12 +219,12 @@ export async function startHost(resources: AsyncDisposableStack) {
 			await json(manager + '/install-plan', {
 				kind: 'repository',
 				repositoryId: source.id,
-				pluginId: plugin.name,
-				version: plugin.version,
+				pluginId: targetPackage.name,
+				version: targetPackage.version,
 			}),
 		);
 	assert.deepEqual(plan.blockers, []);
-	assert.equal(plan.steps.length, 2);
+	assert.equal(plan.steps.length, packages.length);
 	await operation(manager + '/install', { plan });
 
 	async function logs(): Promise<string> {

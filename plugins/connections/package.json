@@ -1,0 +1,44 @@
+{
+  "name": "@nexus-terminal/connections",
+  "version": "0.0.1-dev.1",
+  "type": "module",
+  "description": "Manage SSH, RDP and VNC connections",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./connections-api": {
+      "types": "./dist/types/node/connections-api.d.ts"
+    },
+    "./connections-client-api": {
+      "types": "./dist/types/browser/connections-client-api.d.ts"
+    }
+  },
+  "peerDependencies": {
+    "nexus-terminal": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=26.13.1"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test:setup": "playwright install --with-deps chromium",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && tsx --test tests/*.test.ts"
+  },
+  "nexus": {
+    "kind": "application",
+    "entry": {
+      "backend": "dist/node/index.js",
+      "frontend": "dist/browser/index.js"
+    },
+    "dependsOn": {
+      "@nexus-terminal/credentials": "^0.0.1-dev.1"
+    },
+    "i18n": {
+      "zh-CN": {
+        "description": "管理 SSH、RDP 和 VNC 连接"
+      }
+    }
+  }
+}

@@ -106,7 +106,7 @@ function testPlugin(plugins, plugin) {
 			runPnpm(dependency, ['build']);
 			artifacts[dependency.manifest.name] = pack(dependency, directory);
 		}
-		if (plugin.manifest.scripts?.['test:setup']) runPnpm(plugin, ['test:setup']);
+		if (process.env.CI && plugin.manifest.scripts?.['test:setup']) runPnpm(plugin, ['test:setup']);
 		runPnpm(plugin, ['typecheck']);
 		// Integration suites install candidate dependency archives using this map.
 		const env = { ...process.env, NEXUS_TEST_PLUGIN_ARTIFACTS: JSON.stringify(artifacts) };

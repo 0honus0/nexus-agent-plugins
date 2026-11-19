@@ -166,6 +166,9 @@ importers:
 
   .:
     devDependencies:
+      '@lucide/vue':
+        specifier: 1.72.0
+        version: 1.72.0(vue@3.5.45(typescript@6.0.3))
       '@nexus-terminal/format':
         specifier: file:../../honus/nexus-terminal/scripts/format
         version: file:../../honus/nexus-terminal/scripts/format
@@ -188,8 +191,11 @@ importers:
         specifier: ^0.29.9
         version: 0.29.9
       nexus-terminal:
-        specifier: file:vendor/nexus-terminal-1.0.0.tgz
-        version: file:vendor/nexus-terminal-1.0.0.tgz(@lucide/vue@1.72.0(vue@3.5.45(typescript@6.0.3)))(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(interactjs@1.10.28)(kysely@0.29.9)(motion-v@2.12.0(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3)))(neverthrow@8.2.0)(reka-ui@2.11.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3))(zod@4.6.7)
+        specifier: file:vendor/nexus-terminal-1.1.0.tgz
+        version: file:vendor/nexus-terminal-1.1.0.tgz(@lucide/vue@1.72.0(vue@3.5.45(typescript@6.0.3)))(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(interactjs@1.10.28)(kysely@0.29.9)(motion-v@2.12.0(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3)))(neverthrow@8.2.0)(reka-ui@2.11.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3))(zod@4.6.7)
+      reka-ui:
+        specifier: ^2.11.0
+        version: 2.11.0(vue@3.5.45(typescript@6.0.3))
       semver:
         specifier: ^7.8.6
         version: 7.8.6
@@ -211,6 +217,9 @@ importers:
       vue:
         specifier: ^3.5.45
         version: 3.5.45(typescript@6.0.3)
+      vue-i18n:
+        specifier: ^11.4.22
+        version: 11.4.22(vue@3.5.45(typescript@6.0.3))
       vue-tsc:
         specifier: ^3.3.14
         version: 3.3.14(typescript@6.0.3)
@@ -483,6 +492,22 @@ packages:
 
   '@internationalized/number@3.6.9':
     resolution: {integrity: sha512-GgWy2caO/+hV9sT/oCTWGHvbjmJMPT9kkXzoKRLnkEq7adghhR7UprhvY9sXrKfrp3NcDfhF6QQHXR1KfQbB8g==}
+
+  '@intlify/core-base@11.4.22':
+    resolution: {integrity: sha512-qEdP+gpuppvC2oKjVr8yZso1E7CuIvArQViule5b6n27ZAQb1QJ7LdiWI7mosMBxNCIobJXw6KBgQWvX7CmHVg==}
+    engines: {node: '>= 22'}
+
+  '@intlify/devtools-types@11.4.22':
+    resolution: {integrity: sha512-zRzElvuCD+j8Sv+LQBf1X8Ve7G61gQUw4WwHDbrxoY1+3FrnRZ1kMgWKGDNyG/qMntwa31h+bQZ3sRTkCqrgMQ==}
+    engines: {node: '>= 22'}
+
+  '@intlify/message-compiler@11.4.22':
+    resolution: {integrity: sha512-X3ButMf+8TvO8kks3xA17tglGeiFLwA2S3TkxHxurRLpz8NpDlN2t9pjHdImKtmjruB6B9I+WgkDWz00zDYkTw==}
+    engines: {node: '>= 22'}
+
+  '@intlify/shared@11.4.22':
+    resolution: {integrity: sha512-RHAe7pwIYDt+AkQs9xQBdMLrux7+O4R8p3FKC47ewpEGhKqNzzJ2vkQ4gApAF/LMzj80nRUwIwQDn0uF/sgnqQ==}
+    engines: {node: '>= 22'}
 
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
@@ -779,6 +804,9 @@ packages:
 
   '@vue/compiler-ssr@3.5.45':
     resolution: {integrity: sha512-RF5sbZOfYz5AK00tOJUn2PwFXR2fS1u2HVzI8D9VF9rGAFxuGBqg2bB1kJ3ZHMprqSltXnT9MZE1IsqjSM8oew==}
+
+  '@vue/devtools-api@6.6.4':
+    resolution: {integrity: sha512-sGhTPMuXqZ1rVOk32RylztWkfXTRhuS7vgAKv0zjqk8gbsHkJ7xfFf+jbySxt7tWObEJwyKaHMikV/WGDiQm8g==}
 
   '@vue/language-core@3.3.14':
     resolution: {integrity: sha512-kRB+3hHg0c+BdD1XLAvwjVMQd5pC05zijSlPDRI3ERvC/s04JlRs5upy2KjeMg/9m9oD5zuMVh9yVvkKfZqoJg==}
@@ -1196,9 +1224,9 @@ packages:
     resolution: {integrity: sha512-kOCT/1MCPAxY5iUV3wytNFUMUolzuwd/VF/1KCx7kf6CutrOsTie+84zTGTpgQycjvfLdBBdvBvFLqFD2c0wkQ==}
     engines: {node: '>=18'}
 
-  nexus-terminal@file:vendor/nexus-terminal-1.0.0.tgz:
-    resolution: {integrity: sha512-vLr1ILnAXztE+EBXLbhQJgKv3JARJWOJKmMBKdGyacVsgiJfOvyoy6e39fRPED+VwqsFG68CW/fJmXKzvJueDQ==, tarball: file:vendor/nexus-terminal-1.0.0.tgz}
-    version: 1.0.0
+  nexus-terminal@file:vendor/nexus-terminal-1.1.0.tgz:
+    resolution: {integrity: sha512-9WjY3W25/pWfkHLuxCQQ7RNFf6idvMSGkbEdFTbV6JGJUpr9y4PkR4dzaRJffH7tkLRX+u3JQwg16aoHQcR4NA==, tarball: file:vendor/nexus-terminal-1.1.0.tgz}
+    version: 1.1.0
     engines: {node: '>=26.13.1'}
     peerDependencies:
       '@lucide/vue': 1.72.0
@@ -1416,6 +1444,12 @@ packages:
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
+
+  vue-i18n@11.4.22:
+    resolution: {integrity: sha512-ATfJU6iSSKnUYXubiwH4oScLYIgM2N3KcoqaUD5v5EM2OANePbON7l7CqWsUQhPNHZvszrk9rItqebr8Vo5A5Q==}
+    engines: {node: '>= 22'}
+    peerDependencies:
+      vue: ^3.0.0
 
   vue-tsc@3.3.14:
     resolution: {integrity: sha512-URAu2H9AuMZMg9GCgnqbaHHHd8pBZRAwNV2e2yYS8VDsoTVXHiOSo663OS6DkEvauQ2yixn5TPFJ9WV9QIspkA==}
@@ -1656,6 +1690,24 @@ snapshots:
   '@internationalized/number@3.6.9':
     dependencies:
       '@swc/helpers': 0.5.24
+
+  '@intlify/core-base@11.4.22':
+    dependencies:
+      '@intlify/devtools-types': 11.4.22
+      '@intlify/message-compiler': 11.4.22
+      '@intlify/shared': 11.4.22
+
+  '@intlify/devtools-types@11.4.22':
+    dependencies:
+      '@intlify/core-base': 11.4.22
+      '@intlify/shared': 11.4.22
+
+  '@intlify/message-compiler@11.4.22':
+    dependencies:
+      '@intlify/shared': 11.4.22
+      source-map-js: 1.2.2
+
+  '@intlify/shared@11.4.22': {}
 
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
@@ -1944,6 +1996,8 @@ snapshots:
     dependencies:
       '@vue/compiler-dom': 3.5.45
       '@vue/shared': 3.5.45
+
+  '@vue/devtools-api@6.6.4': {}
 
   '@vue/language-core@3.3.14':
     dependencies:
@@ -2361,7 +2415,7 @@ snapshots:
     optionalDependencies:
       '@rollup/rollup-linux-x64-gnu': 4.68.5
 
-  nexus-terminal@file:vendor/nexus-terminal-1.0.0.tgz(@lucide/vue@1.72.0(vue@3.5.45(typescript@6.0.3)))(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(interactjs@1.10.28)(kysely@0.29.9)(motion-v@2.12.0(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3)))(neverthrow@8.2.0)(reka-ui@2.11.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3))(zod@4.6.7):
+  nexus-terminal@file:vendor/nexus-terminal-1.1.0.tgz(@lucide/vue@1.72.0(vue@3.5.45(typescript@6.0.3)))(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(interactjs@1.10.28)(kysely@0.29.9)(motion-v@2.12.0(@vueuse/core@15.0.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3)))(neverthrow@8.2.0)(reka-ui@2.11.0(vue@3.5.45(typescript@6.0.3)))(vue@3.5.45(typescript@6.0.3))(zod@4.6.7):
     dependencies:
       '@lucide/vue': 1.72.0(vue@3.5.45(typescript@6.0.3))
       '@types/express': 5.0.6
@@ -2560,6 +2614,14 @@ snapshots:
       semver: 7.8.6
     transitivePeerDependencies:
       - supports-color
+
+  vue-i18n@11.4.22(vue@3.5.45(typescript@6.0.3)):
+    dependencies:
+      '@intlify/core-base': 11.4.22
+      '@intlify/devtools-types': 11.4.22
+      '@intlify/shared': 11.4.22
+      '@vue/devtools-api': 6.6.4
+      vue: 3.5.45(typescript@6.0.3)
 
   vue-tsc@3.3.14(typescript@6.0.3):
     dependencies:
