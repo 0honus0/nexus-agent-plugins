@@ -1,0 +1,20 @@
+{
+  "name": "@nexus-terminal/test-provider",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "nexus-terminal": "^1.0.0"
+  },
+  "nexus": {
+    "kind": "extension",
+    "entry": {
+      "backend": "dist/node/index.js",
+      "frontend": "dist/browser/index.js"
+    },
+    "authMethods": true
+  }
+}

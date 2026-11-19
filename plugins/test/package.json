@@ -1,0 +1,29 @@
+{
+  "name": "@nexus-terminal/test",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "description": "SDK contract tests for the Nexus Terminal host",
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "nexus-terminal": "^1.0.0"
+  },
+  "nexus": {
+    "kind": "application",
+    "entry": {
+      "backend": "dist/node/index.js",
+      "frontend": "dist/browser/index.js"
+    },
+    "dependsOn": {
+      "@nexus-terminal/test-provider": "0.0.1"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "test:setup": "playwright install --with-deps chromium",
+    "test": "pnpm build && tsx --test tests/*.test.ts"
+  }
+}

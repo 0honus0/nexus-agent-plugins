@@ -1,0 +1,24 @@
+name: Set up plugin repository
+description: Install pinned Node, pnpm and the shared host format tool
+runs:
+  using: composite
+  steps:
+    # The path matches the existing file: dependency in the plugin repository.
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: 0honus0/nexus-terminal
+        ref: 442905d3d0d5dc495ce140be289eb8a68e154b85
+        path: honus/nexus-terminal
+        sparse-checkout: scripts/format
+        persist-credentials: false
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      with:
+        package_json_file: home/nexus-agent-plugins/package.json
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '26.13.1'
+        cache: pnpm
+        cache-dependency-path: home/nexus-agent-plugins/pnpm-lock.yaml
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+      working-directory: home/nexus-agent-plugins

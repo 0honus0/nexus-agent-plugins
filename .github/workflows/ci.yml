@@ -1,0 +1,80 @@
+name: Plugin CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      plugins: ${{ steps.matrix.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: home/nexus-agent-plugins
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./home/nexus-agent-plugins/.github/actions/setup
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: paths
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          working-directory: home/nexus-agent-plugins
+          token: ''
+          base: ${{ github.event_name == 'push' && github.ref || github.event.pull_request.base.sha }}
+          list-files: json
+          filters: |
+            changed:
+              - '**'
+      - id: matrix
+        working-directory: home/nexus-agent-plugins
+        env:
+          CHANGED_FILES: ${{ steps.paths.outputs.changed_files || '[]' }}
+          FORCE_ALL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: node scripts/ci/plugins.mjs matrix
+      - run: pnpm format:check
+        working-directory: home/nexus-agent-plugins
+      - run: node --test scripts/ci/*.test.mjs
+        working-directory: home/nexus-agent-plugins
+
+  plugins:
+    needs: changes
+    if: needs.changes.outputs.plugins != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.changes.outputs.plugins) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: home/nexus-agent-plugins
+          persist-credentials: false
+      - uses: ./home/nexus-agent-plugins/.github/actions/setup
+      - working-directory: home/nexus-agent-plugins
+        env:
+          PLUGIN_NAME: ${{ matrix.plugin }}
+        run: pnpm test:plugin "$PLUGIN_NAME"
+
+  result:
+    if: always()
+    needs: [changes, plugins]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          PLUGINS: ${{ needs.plugins.result }}
+        run: test "$CHANGES" = success && { test "$PLUGINS" = success || test "$PLUGINS" = skipped; }

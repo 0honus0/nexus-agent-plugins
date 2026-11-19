@@ -1,0 +1,65 @@
+name: Plugin Release
+
+on:
+  push:
+    tags: ['*/v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: home/nexus-agent-plugins
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify tagged commit is on main
+        working-directory: home/nexus-agent-plugins
+        run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
+      - uses: ./home/nexus-agent-plugins/.github/actions/setup
+      - name: Test and pack tagged plugin
+        working-directory: home/nexus-agent-plugins
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir "$RUNNER_TEMP/plugin-release"
+          pnpm release:pack "$RELEASE_TAG" "$RUNNER_TEMP/plugin-release"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plugin-release
+          path: ${{ runner.temp }}/plugin-release/*
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.1'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: plugin-release
+          path: ${{ runner.temp }}/plugin-release
+      - name: Publish package and update market catalog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          export CATALOG_BASE_SHA="$(git rev-parse HEAD)"
+          node scripts/ci/publish.mjs "$RELEASE_TAG" "$RUNNER_TEMP/plugin-release"

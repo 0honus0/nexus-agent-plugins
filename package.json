@@ -1,0 +1,38 @@
+{
+  "name": "nexus-agent-plugins",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "devDependencies": {
+    "@nexus-terminal/format": "file:../../honus/nexus-terminal/scripts/format",
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "@types/ssh2": "1.15.6",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "kysely": "^0.29.9",
+    "nexus-terminal": "file:vendor/nexus-terminal-1.0.0.tgz",
+    "semver": "^7.8.6",
+    "ssh2": "1.17.0",
+    "tar": "^7.5.23",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.8",
+    "vue": "^3.5.45",
+    "vue-tsc": "^3.3.14",
+    "ws": "^8.23.0",
+    "zod": "^4.6.7"
+  },
+  "scripts": {
+    "format": "nexus-format .",
+    "format:check": "nexus-format --check .",
+    "typecheck": "pnpm --dir plugins/test typecheck && pnpm --dir plugins/ssh typecheck",
+    "build:test-plugin": "pnpm --dir plugins/test build",
+    "check": "pnpm typecheck && pnpm format:check",
+    "test:sdk": "pnpm --dir plugins/test test",
+    "build:ssh-plugin": "pnpm --dir plugins/ssh build",
+    "test:ssh": "pnpm --dir plugins/ssh test",
+    "test:plugin": "node scripts/ci/plugins.mjs test",
+    "release:pack": "node scripts/ci/plugins.mjs release"
+  }
+}
