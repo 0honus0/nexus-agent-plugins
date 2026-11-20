@@ -58,9 +58,14 @@ it('binds an account before configuration and accepts only a valid signature for
 	} finally {
 		initialConfig.resolve();
 	}
-	await expect(app.getByRole('heading', { name: 'Identity provider' })).toBeVisible();
-	await expect(app.getByRole('heading', { name: 'Sign-in and redirect' })).toBeVisible();
 	const clientFields = app.locator('.oidc-fields').first();
+	const form = app.locator('form');
+	const save = form.getByRole('button', { name: 'Save configuration', exact: true });
+	const callback = app.getByLabel('Binding redirect URI', { exact: true });
+	await expect(form.locator('[data-ui="section"][data-appearance="panel"]')).toHaveCount(0);
+	await expect(form.getByRole('heading', { name: 'Identity provider' })).toBeVisible();
+	await expect(form.getByRole('heading', { name: 'Sign-in and redirect' })).toBeVisible();
+	await expect(form.locator('button[type="submit"]')).toHaveCount(1);
 
 	const fieldsShareRow = () =>
 		clientFields.evaluate((row) => {
@@ -68,25 +73,39 @@ it('binds an account before configuration and accepts only a valid signature for
 			return first!.top === second!.top && first!.right <= second!.left;
 		});
 
+	const saveAlignsWithFields = () =>
+		callback.evaluate((input) => {
+			const field = input.closest('[data-ui="input"]')!.getBoundingClientRect();
+			const button = input.closest('form')!.querySelector('button[type="submit"]')!.getBoundingClientRect();
+			return {
+				left: button.left - field.left,
+				right: button.right - field.right,
+				below: button.top > field.bottom,
+			};
+		});
+
 	await expect.poll(fieldsShareRow).toBe(true);
+	await expect.poll(saveAlignsWithFields).toEqual({ left: 0, right: 0, below: true });
 	const wideViewport = page.viewportSize()!;
 	await page.setViewportSize({ width: 420, height: 800 });
 	await expect.poll(fieldsShareRow).toBe(false);
-	await expect(app.getByRole('button', { name: 'Authorize and bind', exact: true })).toBeVisible();
+	await expect(save).toBeVisible();
+	await expect.poll(saveAlignsWithFields).toEqual({ left: 0, right: 0, below: true });
 	await page.setViewportSize(wideViewport);
 
-	await expect(app.getByRole('button', { name: 'Authorize and bind', exact: true })).toBeDisabled();
+	await expect(save).toBeDisabled();
 	await app.getByLabel('Issuer URL', { exact: true }).fill(provider.issuer);
 	await app.getByLabel('Client ID', { exact: true }).fill(provider.clientId);
 	await app.getByLabel('Client secret', { exact: true }).fill(provider.secret);
-	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveValue('');
+	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveCount(0);
 	const before = OidcStatusSchema.parse(await host.json(path + '/configuration'));
 	expect(before.config).toBeNull();
 	const callbackUrl = host.origin + before.callbackPath;
 	const bindingUrl = host.origin + oidcBindingCallbackPath;
 	await expect(app.getByLabel('Redirect URI', { exact: true })).toHaveValue(callbackUrl);
-	await expect(app.getByLabel('Binding redirect URI', { exact: true })).toHaveValue(bindingUrl);
-	await expectFormFields(app.locator('form'));
+	await expect(callback).toHaveValue(bindingUrl);
+	await expect(save).toHaveAccessibleDescription(/saved after verification/u);
+	await expectFormFields(form);
 
 	const startUrl = host.origin + path + '/binding/start';
 	const finishUrl = host.origin + path + '/binding/finish';
@@ -104,17 +123,17 @@ it('binds an account before configuration and accepts only a valid signature for
 	expect(wrongState.status()).toBe(400);
 	expect(OidcStatusSchema.parse(await host.json(path + '/configuration')).config).toBeNull();
 
-	const [completed] = await Promise.all([
-		page.waitForResponse(finishUrl),
-		app.getByRole('button', { name: 'Authorize and bind', exact: true }).click(),
-	]);
+	const [completed] = await Promise.all([page.waitForResponse(finishUrl), save.click()]);
 	expect(completed.status()).toBe(200);
 	const replayBinding = await page.request.post(finishUrl, { data: completed.request().postDataJSON() });
 	expect(replayBinding.status()).toBe(400);
 	await expect(page).toHaveURL(host.origin + '/');
 	await page.getByRole('button', { name: 'OpenID Connect', exact: true }).click();
 	await expect(app.getByText('Configured', { exact: true })).toBeVisible();
-	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveValue(provider.ownerSubject);
+	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveCount(0);
+	await expect(save).toBeVisible();
+	await expect(form.locator('button[type="submit"]')).toHaveCount(1);
+	await expect(app.getByRole('button', { name: 'Clear configuration', exact: true })).toBeVisible();
 	await expect(app.getByLabel('Client secret', { exact: true })).toHaveValue('');
 	const saved = await host.json(path + '/configuration');
 	expect(saved).not.toHaveProperty('config.clientSecret');

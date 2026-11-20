@@ -1,16 +1,15 @@
 <script setup lang="ts">
-	import { Copy, KeyRound, Link2, Save, ShieldCheck, Trash2 } from '@lucide/vue';
+	import { Copy, KeyRound, Link2, Save, Trash2 } from '@lucide/vue';
 	import type { PluginWindowProps } from 'nexus-terminal/browser';
 	import { UiBadge, UiButton, UiDialog, UiField, UiInput, UiSection, UiSelect } from 'nexus-terminal/browser/ui';
 	import { computed, onMounted, ref, useId } from 'vue';
 	import { useI18n } from 'vue-i18n';
 	import {
 		OidcBindingInputSchema,
-		OidcConfigInputSchema,
 		OidcOriginSchema,
 		OidcStatusSchema,
 		oidcBindingCallbackPath,
-		type OidcConfigInput,
+		type OidcBindingInput,
 	} from '../shared/oidc-http-types.js';
 	import { messages } from './messages.js';
 	import { bindOidcAccount, reportOidcFailure } from './oidc-client-api.js';
@@ -18,8 +17,9 @@
 	const { context, view } = defineProps<PluginWindowProps>();
 	const { t } = useI18n({ useScope: 'local', messages });
 	const issuerId = useId();
+	const bindingHintId = useId();
 	const status = ref<Awaited<ReturnType<typeof loadStatus>>>();
-	const form = ref<OidcConfigInput>(blankForm());
+	const form = ref<OidcBindingInput>(blankForm());
 	const working = ref(false);
 	const binding = ref(false);
 	const formDisabled = computed(() => !status.value || working.value || binding.value);
@@ -40,18 +40,13 @@
 			uri: origin.success && status.value && path ? new URL(path, origin.data).href : '',
 		}));
 	});
-	const bindingInput = computed(() => {
-		const { subject: _subject, ...input } = form.value;
-		return OidcBindingInputSchema.safeParse(input);
-	});
-	const configInput = computed(() => OidcConfigInputSchema.safeParse(form.value));
+	const bindingInput = computed(() => OidcBindingInputSchema.safeParse(form.value));
 
-	function blankForm(): OidcConfigInput {
+	function blankForm(): OidcBindingInput {
 		return {
 			issuer: '',
 			origin: location.origin,
 			clientId: '',
-			subject: '',
 			authMethod: 'client_secret_basic',
 			clientSecret: '',
 		};
@@ -63,7 +58,12 @@
 
 	function apply(value: Awaited<ReturnType<typeof loadStatus>>) {
 		status.value = value;
-		form.value = value.config ? { ...value.config, clientSecret: '' } : blankForm();
+		if (!value.config) {
+			form.value = blankForm();
+			return;
+		}
+		const { subject: _subject, ...provider } = value.config;
+		form.value = { ...provider, clientSecret: '' };
 	}
 
 	onMounted(async () => {
@@ -75,32 +75,6 @@
 			reportOidcFailure(context, cause, view.signal);
 		}
 	});
-
-	async function save() {
-		if (formDisabled.value) return;
-		const result = configInput.value;
-		if (!result.success) return;
-		working.value = true;
-		try {
-			const next = await context.app.tasks.run(
-				(signal) =>
-					context.app.http.json('/configuration', OidcStatusSchema, {
-						method: 'PUT',
-						signal,
-						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify(result.data),
-					}),
-				{ view },
-			);
-			view.signal.throwIfAborted();
-			apply(next);
-			context.app.log.report({ level: 'info', code: 'OIDC_CONFIG_SAVED', userVisible: true });
-		} catch (cause) {
-			reportOidcFailure(context, cause, view.signal);
-		} finally {
-			working.value = false;
-		}
-	}
 
 	async function bind() {
 		const input = bindingInput.value;
@@ -146,10 +120,23 @@
 </script>
 
 <template>
-	<form class="oidc-app" :aria-busy="working || binding" @submit.prevent="save">
-		<UiSection appearance="panel" :title="t('provider')" :icon="KeyRound">
+	<form class="oidc-app" :aria-busy="working || binding" @submit.prevent="bind">
+		<UiSection :title="t('provider')" :icon="KeyRound">
 			<template v-if="status?.config" #actions>
 				<UiBadge tone="success" dot>{{ t('configured') }}</UiBadge>
+				<UiButton
+					type="button"
+					appearance="ghost"
+					density="compact"
+					tone="danger"
+					icon-only
+					:aria-label="t('remove')"
+					:title="t('remove')"
+					:disabled="formDisabled"
+					@click="confirming = true"
+				>
+					<Trash2 :size="16" />
+				</UiButton>
 			</template>
 			<template #default>
 				<div class="oidc-fields">
@@ -194,15 +181,10 @@
 				</div>
 			</template>
 		</UiSection>
-		<UiSection appearance="panel" :title="t('signIn')" :icon="Link2">
-			<div class="oidc-fields">
-				<UiField :label="t('subject')" :hint="t('subjectHint')" v-slot="{ id, describedby }">
-					<UiInput :id="id" v-model="form.subject" :aria-describedby="describedby" :disabled="formDisabled" />
-				</UiField>
-				<UiField :label="t('origin')" v-slot="{ id }">
-					<UiInput :id="id" v-model="form.origin" type="url" :disabled="formDisabled" required />
-				</UiField>
-			</div>
+		<UiSection class="oidc-redirects" :title="t('signIn')" :icon="Link2">
+			<UiField :label="t('origin')" v-slot="{ id }">
+				<UiInput :id="id" v-model="form.origin" type="url" :disabled="formDisabled" required />
+			</UiField>
 			<UiField
 				v-for="redirect in redirects"
 				:key="redirect.label"
@@ -232,41 +214,20 @@
 				</UiInput>
 			</UiField>
 		</UiSection>
-		<div class="oidc-actions">
+		<div class="oidc-save">
+			<p :id="bindingHintId">{{ t('bindHint') }}</p>
 			<UiButton
-				v-if="status?.config"
-				type="button"
-				tone="danger"
-				appearance="ghost"
-				:disabled="formDisabled"
-				@click="confirming = true"
+				type="submit"
+				tone="primary"
+				block
+				loading-animation="spinner"
+				:aria-describedby="bindingHintId"
+				:loading="binding"
+				:disabled="formDisabled || !bindingInput.success"
 			>
-				<template #leading><Trash2 :size="16" /></template>
-				{{ t('remove') }}
+				<template #leading><Save :size="16" /></template>
+				{{ t('save') }}
 			</UiButton>
-			<div class="oidc-save">
-				<UiButton
-					v-if="status?.config || form.subject"
-					type="submit"
-					loading-animation="spinner"
-					:loading="working && !confirming"
-					:disabled="formDisabled || !configInput.success"
-				>
-					<template #leading><Save :size="16" /></template>
-					{{ t('save') }}
-				</UiButton>
-				<UiButton
-					type="button"
-					tone="primary"
-					loading-animation="spinner"
-					:loading="binding"
-					:disabled="formDisabled || !bindingInput.success"
-					@click="bind"
-				>
-					<template #leading><ShieldCheck :size="16" /></template>
-					{{ t('bind') }}
-				</UiButton>
-			</div>
 		</div>
 		<UiDialog
 			:open="confirming"
@@ -284,7 +245,6 @@
 
 <style scoped>
 	.oidc-app {
-		--ui-section-padding: 18px;
 		container-type: inline-size;
 		display: grid;
 		gap: var(--ui-layout-gap, 16px);
@@ -300,18 +260,22 @@
 		gap: var(--ui-layout-gap, 16px);
 	}
 
-	.oidc-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 12px;
+	.oidc-redirects,
+	.oidc-save {
+		border-block-start: 1px solid var(--ui-border);
+		padding-block-start: var(--ui-layout-gap, 16px);
 	}
 
 	.oidc-save {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-		gap: 12px;
-		margin-inline-start: auto;
+		display: grid;
+		gap: 10px;
+	}
+
+	.oidc-save p {
+		margin: 0;
+		color: var(--ui-muted);
+		font-size: 12px;
+		line-height: 1.7;
 	}
 
 	@container (max-width: 32rem) {
