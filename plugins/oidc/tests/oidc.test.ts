@@ -2,14 +2,18 @@ import { chromium, expect } from '@playwright/test';
 import { it } from 'vitest';
 import { manager as marketplaceManager, pluginFixture, startHost } from '../../test/tests/host.js';
 import { collectBrowserErrors, expectFormFields } from '../../test/tests/browser-checks.js';
-import { OidcStatusSchema } from '../src/shared/oidc-http-types.js';
+import {
+	OidcBindingAuthorizationSchema,
+	OidcStatusSchema,
+	oidcBindingCallbackPath,
+} from '../src/shared/oidc-http-types.js';
 import { startProvider } from './fixtures/oidc-provider.js';
 
 const id = '@nexus-terminal/oidc';
 
 const path = '/api/plugins/' + encodeURIComponent(id);
 
-it('configures the provider, accepts only a valid signature for the configured subject', async () => {
+it('binds an account before configuration and accepts only a valid signature for the bound subject', async () => {
 	await using resources = new AsyncDisposableStack();
 	const provider = await startProvider(resources);
 	const host = await startHost(resources, id, [pluginFixture(new URL('../', import.meta.url), id)], {
@@ -18,6 +22,11 @@ it('configures the provider, accepts only a valid signature for the configured s
 	const unauthorized = await fetch(host.origin + path + '/configuration');
 	expect(unauthorized.status).toBe(401);
 	await unauthorized.body?.cancel();
+	for (const action of ['start', 'finish']) {
+		const response = await fetch(host.origin + path + '/binding/' + action, { method: 'POST' });
+		expect(response.status).toBe(401);
+		await response.body?.cancel();
+	}
 
 	const browser = await chromium.launch({
 		headless: true,
@@ -63,19 +72,49 @@ it('configures the provider, accepts only a valid signature for the configured s
 	const wideViewport = page.viewportSize()!;
 	await page.setViewportSize({ width: 420, height: 800 });
 	await expect.poll(fieldsShareRow).toBe(false);
-	await expect(app.getByRole('button', { name: 'Save configuration', exact: true })).toBeVisible();
+	await expect(app.getByRole('button', { name: 'Authorize and bind', exact: true })).toBeVisible();
 	await page.setViewportSize(wideViewport);
 
+	await expect(app.getByRole('button', { name: 'Authorize and bind', exact: true })).toBeDisabled();
 	await app.getByLabel('Issuer URL', { exact: true }).fill(provider.issuer);
 	await app.getByLabel('Client ID', { exact: true }).fill(provider.clientId);
 	await app.getByLabel('Client secret', { exact: true }).fill(provider.secret);
-	await app.getByLabel('Allowed subject (sub)', { exact: true }).fill(provider.ownerSubject);
+	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveValue('');
 	const before = OidcStatusSchema.parse(await host.json(path + '/configuration'));
+	expect(before.config).toBeNull();
 	const callbackUrl = host.origin + before.callbackPath;
+	const bindingUrl = host.origin + oidcBindingCallbackPath;
 	await expect(app.getByLabel('Redirect URI', { exact: true })).toHaveValue(callbackUrl);
+	await expect(app.getByLabel('Binding redirect URI', { exact: true })).toHaveValue(bindingUrl);
 	await expectFormFields(app.locator('form'));
-	await app.getByRole('button', { name: 'Save configuration', exact: true }).click();
+
+	const startUrl = host.origin + path + '/binding/start';
+	const finishUrl = host.origin + path + '/binding/finish';
+	const started = await page.request.post(startUrl, {
+		data: {
+			issuer: provider.issuer,
+			clientId: provider.clientId,
+			clientSecret: provider.secret,
+			origin: host.origin,
+			authMethod: 'client_secret_basic',
+		},
+	});
+	const { transaction } = OidcBindingAuthorizationSchema.parse(await started.json());
+	const wrongState = await page.request.post(finishUrl, { data: { transaction, query: '?state=wrong&code=unused' } });
+	expect(wrongState.status()).toBe(400);
+	expect(OidcStatusSchema.parse(await host.json(path + '/configuration')).config).toBeNull();
+
+	const [completed] = await Promise.all([
+		page.waitForResponse(finishUrl),
+		app.getByRole('button', { name: 'Authorize and bind', exact: true }).click(),
+	]);
+	expect(completed.status()).toBe(200);
+	const replayBinding = await page.request.post(finishUrl, { data: completed.request().postDataJSON() });
+	expect(replayBinding.status()).toBe(400);
+	await expect(page).toHaveURL(host.origin + '/');
+	await page.getByRole('button', { name: 'OpenID Connect', exact: true }).click();
 	await expect(app.getByText('Configured', { exact: true })).toBeVisible();
+	await expect(app.getByLabel('Allowed subject (sub)', { exact: true })).toHaveValue(provider.ownerSubject);
 	await expect(app.getByLabel('Client secret', { exact: true })).toHaveValue('');
 	const saved = await host.json(path + '/configuration');
 	expect(saved).not.toHaveProperty('config.clientSecret');
@@ -105,13 +144,13 @@ it('configures the provider, accepts only a valid signature for the configured s
 	const acceptedResponse = await accepted;
 	const cookie = (await acceptedResponse.request().allHeaders()).cookie;
 	expect(cookie?.includes('nexus.oidc='), 'OIDC browser transaction cookie is present').toBe(true);
-	expect(provider.tokensIssued, 'each callback exchanged its authorization code').toBe(3);
+	expect(provider.tokensIssued, 'each callback exchanged its authorization code').toBe(4);
 	expect(acceptedResponse.headers().location).toBe('/');
 	await expect(page).toHaveURL(host.origin + '/');
 	await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
 
 	const replay = await page.request.get(acceptedResponse.url(), { maxRedirects: 0 });
 	expect(replay.headers().location).toBe('/login?oidc=failed');
-	expect(provider.tokensIssued).toBe(3);
+	expect(provider.tokensIssued).toBe(4);
 	expect(errors).toEqual([]);
 }, 60_000);

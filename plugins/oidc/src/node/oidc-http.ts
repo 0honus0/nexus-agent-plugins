@@ -4,6 +4,9 @@ import { z } from 'zod';
 import {
 	EmptySchema,
 	OidcAuthorizationSchema,
+	OidcBindingAuthorizationSchema,
+	OidcBindingFinishSchema,
+	OidcBindingInputSchema,
 	OidcConfigInputSchema,
 	OidcStartSchema,
 	OidcStatusSchema,
@@ -68,6 +71,25 @@ export function registerOidcHttp(context: PluginContextApi, service: OidcService
 	const callbackPath = method.baseURL + 'callback';
 
 	context.app.http.register([
+		{
+			method: 'post',
+			path: '/binding/start',
+			input: OidcBindingInputSchema,
+			output: OidcBindingAuthorizationSchema,
+
+			handler: (input: z.output<typeof OidcBindingInputSchema>, signal) => service.startBinding(input, signal),
+		},
+		{
+			method: 'post',
+			path: '/binding/finish',
+			input: OidcBindingFinishSchema,
+			output: OidcStatusSchema,
+
+			async handler({ transaction, query }: z.output<typeof OidcBindingFinishSchema>, signal) {
+				await service.finishBinding(transaction, query, signal);
+				return { config: service.config, callbackPath };
+			},
+		},
 		{
 			method: 'get',
 			path: '/configuration',

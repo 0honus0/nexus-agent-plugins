@@ -13,7 +13,7 @@ import {
 	type Configuration,
 } from 'openid-client';
 import { HttpFailure } from 'nexus-terminal/node';
-import { OidcHttpsUrlSchema, type OidcConfig } from '../shared/oidc-http-types.js';
+import { OidcHttpsUrlSchema, OidcSubjectSchema, type OidcBindingInput } from '../shared/oidc-http-types.js';
 
 const authentication = {
 	client_secret_basic: ClientSecretBasic,
@@ -29,7 +29,7 @@ export interface OidcAuthorization {
 	readonly redirectUri: string;
 }
 
-export async function discoverOidc(config: OidcConfig, secret?: string): Promise<Configuration> {
+export async function discoverOidc(config: OidcBindingInput, secret?: string): Promise<Configuration> {
 	try {
 		const issuer = new URL(config.issuer);
 		const client = await discovery(issuer, config.clientId, undefined, authentication[config.authMethod](secret), {
@@ -65,7 +65,7 @@ export async function beginOidcAuthorization(client: Configuration, redirectUri:
 	return { authorizationUrl: authorizationUrl.href, flow: { state, nonce, verifier, client, redirectUri } };
 }
 
-export async function verifyOidcAuthorization(flow: OidcAuthorization, callback: URL, subject: string) {
+export async function verifyOidcAuthorization(flow: OidcAuthorization, callback: URL) {
 	const url = new URL(flow.redirectUri);
 	url.search = callback.search;
 	try {
@@ -75,8 +75,8 @@ export async function verifyOidcAuthorization(flow: OidcAuthorization, callback:
 			expectedNonce: flow.nonce,
 			idTokenExpected: true,
 		});
-		return response.claims()?.sub === subject;
+		return OidcSubjectSchema.safeParse(response.claims()?.sub).data;
 	} catch {
-		return false;
+		return undefined;
 	}
 }

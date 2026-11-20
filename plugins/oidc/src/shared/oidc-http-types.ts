@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const EmptySchema = z.strictObject({});
 
+export const oidcBindingCallbackPath = '/login/oidc/callback';
+
 export const OidcOriginSchema = z
 	.string()
 	.max(512)
@@ -24,14 +26,16 @@ export const OidcHttpsUrlSchema = z
 
 export const OidcAuthMethodSchema = z.enum(['client_secret_basic', 'client_secret_post', 'none']);
 
+export const OidcSubjectSchema = z
+	.string()
+	.min(1)
+	.max(255)
+	.regex(/^[\x20-\x7E]+$/u);
+
 export const OidcConfigSchema = z.strictObject({
-	issuer: OidcHttpsUrlSchema.refine((value) => !new URL(value).search),
+	issuer: OidcHttpsUrlSchema.refine((value) => URL.parse(value)?.search === ''),
 	clientId: z.string().trim().min(1).max(255),
-	subject: z
-		.string()
-		.min(1)
-		.max(255)
-		.regex(/^[\x20-\x7E]+$/u),
+	subject: OidcSubjectSchema,
 	origin: OidcOriginSchema,
 	authMethod: OidcAuthMethodSchema,
 });
@@ -44,6 +48,10 @@ export const OidcConfigInputSchema = OidcConfigSchema.extend({
 
 export type OidcConfigInput = z.infer<typeof OidcConfigInputSchema>;
 
+export const OidcBindingInputSchema = OidcConfigInputSchema.omit({ subject: true });
+
+export type OidcBindingInput = z.infer<typeof OidcBindingInputSchema>;
+
 export const OidcStatusSchema = z.strictObject({
 	config: OidcConfigSchema.nullable(),
 	callbackPath: z.string().startsWith('/api/auth/plugins/'),
@@ -52,3 +60,7 @@ export const OidcStatusSchema = z.strictObject({
 export const OidcStartSchema = z.strictObject({ origin: OidcOriginSchema });
 
 export const OidcAuthorizationSchema = z.strictObject({ authorizationUrl: OidcHttpsUrlSchema });
+
+export const OidcBindingAuthorizationSchema = OidcAuthorizationSchema.extend({ transaction: z.uuid() });
+
+export const OidcBindingFinishSchema = z.strictObject({ transaction: z.uuid(), query: z.string().max(8192) });

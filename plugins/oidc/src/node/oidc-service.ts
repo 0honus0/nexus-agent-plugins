@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { HttpFailure, type PluginContextApi } from 'nexus-terminal/node';
 import type { Configuration } from 'openid-client';
-import type { OidcConfigInput } from '../shared/oidc-http-types.js';
+import { oidcBindingCallbackPath, type OidcBindingInput, type OidcConfigInput } from '../shared/oidc-http-types.js';
 import {
 	beginOidcAuthorization,
 	discoverOidc,
@@ -15,15 +15,24 @@ export const oidcFlowLifetime = 300_000;
 const cryptoOptions = { mode: 'local', context: secretContext } as const;
 
 interface PendingLogin extends OidcAuthorization {
-	readonly expires: number;
+	readonly purpose: 'login';
 	readonly config: StoredOidcConfig;
 }
 
+interface PendingBinding extends OidcAuthorization {
+	readonly purpose: 'binding';
+	readonly revision: number;
+	readonly config: Omit<StoredOidcConfig, 'subject'>;
+}
+
+type PendingFlow = PendingLogin | PendingBinding;
+
 export class OidcService {
 	readonly #storage: OidcStorage;
-	readonly #pending = new Map<string, PendingLogin>();
+	readonly #pending = new Map<string, PendingFlow & { expires: number }>();
 	#config: StoredOidcConfig | undefined;
 	#client: Promise<Configuration> | undefined;
+	#revision = 0;
 	#saving = false;
 
 	constructor(private readonly context: PluginContextApi) {
@@ -40,35 +49,40 @@ export class OidcService {
 		return config;
 	}
 
-	async save({ clientSecret, ...config }: OidcConfigInput, signal: AbortSignal) {
+	async save({ subject, ...input }: OidcConfigInput, signal: AbortSignal) {
 		this.#beginWrite();
 		try {
-			let encryptedSecret: Uint8Array | null = null;
-			let secret: string | undefined;
-			if (config.authMethod !== 'none') {
-				const previous = this.#config;
-				if (clientSecret) {
-					secret = clientSecret;
-					const result = await this.context.app.crypto.encrypt(
-						new TextEncoder().encode(secret),
-						cryptoOptions,
-					);
-					if (result.isErr()) throw new HttpFailure(500, 'OIDC_SECRET_UNAVAILABLE');
-					encryptedSecret = result.value;
-				} else if (
-					previous?.issuer === config.issuer &&
-					previous.clientId === config.clientId &&
-					previous.encryptedSecret
-				) {
-					encryptedSecret = previous.encryptedSecret;
-					secret = await this.#decrypt(previous);
-				} else throw new HttpFailure(400, 'OIDC_SECRET_REQUIRED');
-			}
-			signal.throwIfAborted();
-			const client = await discoverOidc(config, secret);
-			const stored = { ...config, encryptedSecret };
-			await this.#storage.save(stored, signal);
-			this.#apply(stored, client);
+			const { config, client } = await this.#prepare(input, signal);
+			await this.#saveConfig({ ...config, subject }, client, signal);
+		} finally {
+			this.#saving = false;
+		}
+	}
+
+	async startBinding(input: OidcBindingInput, signal: AbortSignal) {
+		if (this.#saving) throw new HttpFailure(409, 'OIDC_CONFIGURATION_CHANGED');
+		const revision = this.#revision;
+		const { config, client } = await this.#prepare(input, signal);
+		const redirectUri = new URL(oidcBindingCallbackPath, config.origin).href;
+		const { authorizationUrl, flow } = await beginOidcAuthorization(client, redirectUri);
+		signal.throwIfAborted();
+		if (revision !== this.#revision || this.#saving) throw new HttpFailure(409, 'OIDC_CONFIGURATION_CHANGED');
+		const transaction = this.#remember({ ...flow, purpose: 'binding', config, revision });
+		return { authorizationUrl, transaction };
+	}
+
+	async finishBinding(transaction: string, query: string, signal: AbortSignal) {
+		const flow = this.#take(transaction, new URLSearchParams(query), 'binding');
+		if (flow?.purpose !== 'binding') throw new HttpFailure(400, 'OIDC_BINDING_FAILED');
+		const callback = new URL(flow.redirectUri);
+		callback.search = query;
+		const subject = await verifyOidcAuthorization(flow, callback);
+		signal.throwIfAborted();
+		if (flow.revision !== this.#revision) throw new HttpFailure(409, 'OIDC_CONFIGURATION_CHANGED');
+		if (subject === undefined) throw new HttpFailure(400, 'OIDC_BINDING_FAILED');
+		this.#beginWrite();
+		try {
+			await this.#saveConfig({ ...flow.config, subject }, flow.client, signal);
 		} finally {
 			this.#saving = false;
 		}
@@ -92,25 +106,17 @@ export class OidcService {
 		const { authorizationUrl, flow } = await beginOidcAuthorization(client, redirectUri);
 		signal.throwIfAborted();
 		if (this.#config !== config) throw new HttpFailure(503, 'OIDC_CONFIGURATION_CHANGED');
-
-		const now = Date.now();
-		for (const [id, entry] of this.#pending) if (entry.expires <= now) this.#pending.delete(id);
-		if (this.#pending.size >= 256) throw new HttpFailure(429, 'OIDC_BUSY');
-		const transaction = randomUUID();
-		this.#pending.set(transaction, { ...flow, config, expires: now + oidcFlowLifetime });
+		const transaction = this.#remember({ ...flow, purpose: 'login', config });
 		return { authorizationUrl, transaction };
 	}
 
 	async verify(transaction: string | undefined, callback: URL, signal: AbortSignal) {
 		if (!transaction) return;
-		const flow = this.#pending.get(transaction);
-		if (!flow || flow.expires <= Date.now() || flow.config !== this.#config) return;
-		const states = callback.searchParams.getAll('state');
-		if (states.length !== 1 || flow.state !== states[0]) return;
-		this.#pending.delete(transaction);
-		const verified = await verifyOidcAuthorization(flow, callback, flow.config.subject);
+		const flow = this.#take(transaction, callback.searchParams, 'login');
+		if (flow?.purpose !== 'login' || flow.config !== this.#config) return;
+		const subject = await verifyOidcAuthorization(flow, callback);
 		signal.throwIfAborted();
-		if (!verified || flow.config !== this.#config) return;
+		if (subject !== flow.config.subject || flow.config !== this.#config) return;
 		return {
 			origin: flow.config.origin,
 
@@ -120,6 +126,54 @@ export class OidcService {
 		};
 	}
 
+	#remember(flow: PendingFlow) {
+		const now = Date.now();
+		for (const [id, entry] of this.#pending) if (entry.expires <= now) this.#pending.delete(id);
+		if (this.#pending.size >= 256) throw new HttpFailure(429, 'OIDC_BUSY');
+		const transaction = randomUUID();
+		this.#pending.set(transaction, { ...flow, expires: now + oidcFlowLifetime });
+		return transaction;
+	}
+
+	#take(transaction: string, query: URLSearchParams, purpose: PendingFlow['purpose']) {
+		const flow = this.#pending.get(transaction);
+		if (!flow || flow.purpose !== purpose || flow.expires <= Date.now()) return;
+		const states = query.getAll('state');
+		if (states.length !== 1 || states[0] !== flow.state) return;
+		this.#pending.delete(transaction);
+		return flow;
+	}
+
+	async #prepare({ clientSecret, ...config }: OidcBindingInput, signal: AbortSignal) {
+		let encryptedSecret: Uint8Array | null = null;
+		let secret: string | undefined;
+		if (config.authMethod !== 'none') {
+			const previous = this.#config;
+			if (clientSecret) {
+				secret = clientSecret;
+				const result = await this.context.app.crypto.encrypt(new TextEncoder().encode(secret), cryptoOptions);
+				if (result.isErr()) throw new HttpFailure(500, 'OIDC_SECRET_UNAVAILABLE');
+				encryptedSecret = result.value;
+			} else if (
+				previous?.issuer === config.issuer &&
+				previous.clientId === config.clientId &&
+				previous.encryptedSecret
+			) {
+				encryptedSecret = previous.encryptedSecret;
+				secret = await this.#decrypt(previous);
+			} else throw new HttpFailure(400, 'OIDC_SECRET_REQUIRED');
+		}
+		signal.throwIfAborted();
+		const client = await discoverOidc(config, secret);
+		signal.throwIfAborted();
+		return { config: { ...config, encryptedSecret }, client };
+	}
+
+	async #saveConfig(config: StoredOidcConfig, client: Configuration, signal: AbortSignal) {
+		await this.#storage.save(config, signal);
+		this.#apply(config, client);
+	}
+
 	#beginWrite() {
 		if (this.#saving) throw new HttpFailure(409, 'OIDC_CONFIGURATION_CHANGED');
 		this.#saving = true;
@@ -127,6 +181,7 @@ export class OidcService {
 
 	#apply(config: StoredOidcConfig | undefined, client?: Configuration) {
 		this.context.signal.throwIfAborted();
+		this.#revision++;
 		this.#config = config;
 		this.#client = client ? Promise.resolve(client) : undefined;
 		this.#pending.clear();

@@ -2,7 +2,7 @@ import { ShieldCheck } from '@lucide/vue';
 import type { PluginModuleApi } from 'nexus-terminal/browser';
 import { defineAsyncComponent } from 'vue';
 import { messages, notices } from './messages.js';
-import { reportOidcFailure, signInWithOidc } from './oidc-client-api.js';
+import { finishOidcBinding, reportOidcFailure, signInWithOidc } from './oidc-client-api.js';
 
 export const activate: PluginModuleApi['activate'] = (context) => {
 	context.onDispose(context.app.log.registerMessages(notices));
@@ -38,6 +38,7 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 		],
 	});
 	context.self.readiness.set({ state: 'ready' });
+	void finishOidcBinding(context);
 	const url = new URL(location.href);
 	if (url.pathname === '/login' && url.searchParams.get('oidc') === 'failed') {
 		url.searchParams.delete('oidc');
