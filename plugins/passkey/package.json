@@ -1,6 +1,6 @@
 {
   "name": "@nexus-terminal/passkey",
-  "version": "0.0.1-dev.1",
+  "version": "0.0.1-dev.2",
   "type": "module",
   "description": "Sign in with WebAuthn passkeys",
   "displayName": "Passkeys",

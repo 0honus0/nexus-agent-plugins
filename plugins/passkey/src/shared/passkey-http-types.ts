@@ -44,7 +44,7 @@ export const PasskeyNameSchema = z.string().trim().min(1).max(80);
 
 export const PasskeySchema = z.strictObject({
 	id: Base64Schema,
-	name: PasskeyNameSchema,
+	name: PasskeyNameSchema.or(z.literal('')),
 	origin: PasskeyOriginSchema,
 	createdAt: z.int().nonnegative(),
 });
@@ -53,9 +53,7 @@ export type Passkey = z.infer<typeof PasskeySchema>;
 
 export const PasskeyListSchema = z.strictObject({ items: z.array(PasskeySchema) });
 
-export const PasskeyAuthenticationStartSchema = z.strictObject({ origin: PasskeyOriginSchema });
-
-export const PasskeyRegistrationStartSchema = PasskeyAuthenticationStartSchema.extend({ name: PasskeyNameSchema });
+export const PasskeyCeremonyStartSchema = z.strictObject({ origin: PasskeyOriginSchema });
 
 export const PasskeyRegistrationOptionsSchema = z.strictObject({
 	transaction: z.uuid(),

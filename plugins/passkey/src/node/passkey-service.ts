@@ -8,6 +8,8 @@ import {
 	type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { HttpFailure, type PluginContextApi } from 'nexus-terminal/node';
+import { PasskeyNameSchema } from '../shared/passkey-http-types.js';
+import { passkeyAuthenticatorNames } from './passkey-authenticators.js';
 import { PasskeyStorage } from './passkey-storage.js';
 
 export const passkeyCeremonyLifetime = 180_000;
@@ -39,7 +41,7 @@ class Ceremonies<Value extends Ceremony> {
 
 export class PasskeyService {
 	readonly storage: PasskeyStorage;
-	readonly #registrations = new Ceremonies<Ceremony & { name: string; userHandle: string }>();
+	readonly #registrations = new Ceremonies<Ceremony & { userHandle: string }>();
 	readonly #authentications = new Ceremonies<Ceremony>();
 	readonly #ownerHandle = randomBytes(32).toString('base64url');
 	#readinessRevision = 0;
@@ -59,7 +61,7 @@ export class PasskeyService {
 		);
 	}
 
-	async startRegistration(origin: string, name: string, signal: AbortSignal) {
+	async startRegistration(origin: string, signal: AbortSignal) {
 		const registered = await this.storage.registrationCredentials(origin);
 		const userHandle = registered[0]?.user_handle ?? this.#ownerHandle;
 		const options = await generateRegistrationOptions({
@@ -75,13 +77,13 @@ export class PasskeyService {
 		});
 		signal.throwIfAborted();
 		return {
-			transaction: this.#registrations.begin({ origin, name, userHandle, challenge: options.challenge }),
+			transaction: this.#registrations.begin({ origin, userHandle, challenge: options.challenge }),
 			options,
 		};
 	}
 
 	async finishRegistration(transaction: string, response: RegistrationResponseJSON, signal: AbortSignal) {
-		const { origin, name, userHandle, challenge } = this.#registrations.consume(transaction);
+		const { origin, userHandle, challenge } = this.#registrations.consume(transaction);
 		const result = await verifyRegistrationResponse({
 			response,
 			expectedChallenge: challenge,
@@ -91,7 +93,10 @@ export class PasskeyService {
 		}).catch(() => undefined);
 		signal.throwIfAborted();
 		if (!result?.verified) throw new HttpFailure(400, 'PASSKEY_REGISTRATION_FAILED');
-		const { id, publicKey, counter } = result.registrationInfo.credential;
+		const { aaguid, credential } = result.registrationInfo;
+		const { id, publicKey, counter } = credential;
+		const authenticator = passkeyAuthenticatorNames.get(aaguid.toLowerCase());
+		const name = authenticator ? (PasskeyNameSchema.safeParse(`${authenticator} Passkey`).data ?? '') : '';
 		const created = await this.storage.create(
 			{
 				id,

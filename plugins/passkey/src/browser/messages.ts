@@ -2,8 +2,7 @@ export const messages = {
 	en: {
 		title: 'Passkeys',
 		add: 'Add passkey',
-		name: 'Passkey name',
-		namePlaceholder: 'For example, work laptop',
+		defaultName: 'Passkey',
 		remove: 'Remove',
 		cancel: 'Cancel',
 		removeTitle: 'Remove passkey?',
@@ -13,8 +12,7 @@ export const messages = {
 	zh: {
 		title: '通行密钥',
 		add: '添加通行密钥',
-		name: '通行密钥名称',
-		namePlaceholder: '例如，办公电脑',
+		defaultName: '通行密钥',
 		remove: '移除',
 		cancel: '取消',
 		removeTitle: '移除通行密钥？',

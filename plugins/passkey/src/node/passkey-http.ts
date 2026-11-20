@@ -5,12 +5,11 @@ import {
 	EmptySchema,
 	PasskeyAuthenticationFinishSchema,
 	PasskeyAuthenticationOptionsSchema,
-	PasskeyAuthenticationStartSchema,
+	PasskeyCeremonyStartSchema,
 	PasskeyIdSchema,
 	PasskeyListSchema,
 	PasskeyRegistrationFinishSchema,
 	PasskeyRegistrationOptionsSchema,
-	PasskeyRegistrationStartSchema,
 	PasskeySchema,
 } from '../shared/passkey-http-types.js';
 import { passkeyCeremonyLifetime, type PasskeyService } from './passkey-service.js';
@@ -26,10 +25,10 @@ export function registerPasskeyHttp(context: PluginContextApi, service: PasskeyS
 			{
 				method: 'post',
 				path: '/options',
-				input: PasskeyAuthenticationStartSchema,
+				input: PasskeyCeremonyStartSchema,
 				output: PasskeyAuthenticationOptionsSchema,
 
-				async handler({ origin }: z.output<typeof PasskeyAuthenticationStartSchema>, signal, request) {
+				async handler({ origin }: z.output<typeof PasskeyCeremonyStartSchema>, signal, request) {
 					const { transaction, options } = await service.startAuthentication(origin, signal);
 					request.setCookie(cookieName, transaction, {
 						httpOnly: true,
@@ -71,11 +70,11 @@ export function registerPasskeyHttp(context: PluginContextApi, service: PasskeyS
 		{
 			method: 'post',
 			path: '/passkeys/options',
-			input: PasskeyRegistrationStartSchema,
+			input: PasskeyCeremonyStartSchema,
 			output: PasskeyRegistrationOptionsSchema,
 
-			handler: ({ origin, name }: z.output<typeof PasskeyRegistrationStartSchema>, signal) =>
-				service.startRegistration(origin, name, signal),
+			handler: ({ origin }: z.output<typeof PasskeyCeremonyStartSchema>, signal) =>
+				service.startRegistration(origin, signal),
 		},
 		{
 			method: 'post',

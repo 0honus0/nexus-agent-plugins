@@ -37,12 +37,12 @@ async function ceremony<Value>(signal: AbortSignal, run: () => Promise<Value>): 
 	}
 }
 
-export async function registerPasskey(context: PluginContextApi, name: string, signal: AbortSignal) {
+export async function registerPasskey(context: PluginContextApi, signal: AbortSignal) {
 	if (!passkeysSupported()) throw new Error('PASSKEY_UNAVAILABLE');
 	const { options, transaction } = await context.app.http.json(
 		'/passkeys/options',
 		PasskeyRegistrationOptionsSchema,
-		post({ origin: location.origin, name }, signal),
+		post({ origin: location.origin }, signal),
 	);
 	const credential = await ceremony(signal, () => startRegistration({ optionsJSON: options }));
 	return context.app.http.json('/passkeys/verify', PasskeySchema, post({ transaction, credential }, signal));
