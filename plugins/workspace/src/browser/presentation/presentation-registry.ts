@@ -62,6 +62,7 @@ export function createPresentationRegistry(
 					...common(),
 					sessionId: c.session.id,
 					enabled: c.active && visible('files') && c.transport.connected.value,
+					connected: c.transport.connected.value,
 					onBusy: c.busy,
 				}),
 			},
@@ -82,8 +83,12 @@ export function createPresentationRegistry(
 					i18n: c.i18n,
 					sessionId: c.session.id,
 					host: c.host,
-					connected: c.transport.connected.value,
-					enabled: c.active && visible('status') && c.transport.connected.value,
+					connecting: c.active && visible('status') && c.transport.connecting.value,
+					enabled:
+						c.active &&
+						visible('status') &&
+						c.transport.connected.value &&
+						!c.transport.terminalClosed.value,
 				}),
 			},
 			{

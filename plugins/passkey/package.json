@@ -1,0 +1,36 @@
+{
+  "name": "@nexus-terminal/passkey",
+  "version": "0.0.1-dev.1",
+  "type": "module",
+  "description": "Sign in with WebAuthn passkeys",
+  "displayName": "Passkeys",
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "nexus-terminal": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=26.13.1"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test:setup": "playwright install --with-deps chromium",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "pnpm build && vitest run"
+  },
+  "nexus": {
+    "kind": "application",
+    "entry": {
+      "backend": "dist/node/index.js",
+      "frontend": "dist/browser/index.js"
+    },
+    "authMethods": true,
+    "i18n": {
+      "zh-CN": {
+        "description": "管理通行密钥并用于登录",
+        "displayName": "通行密钥"
+      }
+    }
+  }
+}

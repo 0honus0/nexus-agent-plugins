@@ -34,16 +34,20 @@
 	import type { FileEntry } from '../shared/workspace-file-types';
 	import { useFileSearch } from './files/use-file-search';
 	import FileIcon from './files/FileIcon.vue';
+	import { filesPresentation } from './files/files-presentation';
 	import PathFavorites from './files/PathFavorites.vue';
+	import WorkspacePathBar from './files/WorkspacePathBar.vue';
 	import FileOperationDialogs from './files/FileOperationDialogs.vue';
 	import { useWorkspaceCatalog } from './catalog/workspace-catalog';
 	import { useFileOperations } from './files/use-file-operations';
 	import { useWorkspaceFilesState } from './files/workspace-files-state';
+	import { usePanePresentation } from './presentation/pane-presentation';
 	import { createWorkspaceClient } from './workspace-client';
 	import { useFiles } from './use-files';
 	const props = defineProps<{
 		sessionId: string;
 		enabled: boolean;
+		connected: boolean;
 		ctx: PluginContextApi;
 		view: PluginWindowApi;
 		i18n: WorkspaceI18n;
@@ -53,7 +57,13 @@
 	const signal = AbortSignal.any([props.ctx.signal, props.view.signal]);
 	const client = createWorkspaceClient(props.ctx, signal),
 		shared = useWorkspaceFilesState();
-	const files = useFiles(props.ctx, props.sessionId, props.view.signal, () => props.enabled);
+	const files = useFiles(
+		props.ctx,
+		props.sessionId,
+		props.view.signal,
+		() => props.enabled,
+		() => props.connected,
+	);
 	const { path, loaded, loading, mutating, busy } = files;
 	const catalog = useWorkspaceCatalog();
 	const operations = useFileOperations(
@@ -68,8 +78,8 @@
 	const surface = ref<HTMLElement>(),
 		searchExpanded = ref(false),
 		showHidden = ref(false),
-		sort = ref('name'),
-		pathInput = ref('.');
+		sort = ref('name');
+	const { style: fileScaleStyle } = usePanePresentation(surface, filesPresentation);
 	const textClipboard = useClipboard({ legacy: true });
 	const selected = ref<string[]>([]),
 		anchor = ref(''),
@@ -86,8 +96,9 @@
 			? { name: '..', path: parentPath.value, kind: 'directory', size: 0, modifiedAt: 0, mode: 0 }
 			: undefined,
 	);
+	const names = new Intl.Collator(undefined, { numeric: true });
 	const rows = computed(() =>
-		(browserSearch.active.value && browserSearch.entries.value ? browserSearch.entries.value : files.rows.value)
+		(browserSearch.active.value && browserSearch.entries.value ? browserSearch.entries.value : files.entries.value)
 			.filter(
 				(entry) =>
 					showHidden.value ||
@@ -102,7 +113,8 @@
 						? b.size - a.size
 						: sort.value === 'modified'
 							? b.modifiedAt - a.modifiedAt
-							: a.name.localeCompare(b.name, undefined, { numeric: true })),
+							: 0) ||
+					names.compare(a.name, b.name),
 			),
 	);
 	const visibleRows = computed(() => (parent.value ? [parent.value, ...rows.value] : rows.value));
@@ -110,12 +122,15 @@
 
 	const isParent = (entry?: FileEntry) => entry?.name === '..';
 
-	watch(path, (value) => {
-		pathInput.value = value;
+	function prefetchEntry(entry: FileEntry, event?: PointerEvent) {
+		if (event?.pointerType !== 'touch' && entry.kind === 'directory') files.prefetch(entry.path);
+	}
+
+	watch(path, () => {
 		selected.value = [];
 		anchor.value = '';
 	});
-	watch(files.rows, () => {
+	watch(files.entries, () => {
 		if (browserSearch.active.value) void browserSearch.search();
 	});
 	watch(
@@ -150,7 +165,8 @@
 	}
 
 	function targets(entry?: FileEntry) {
-		return entry && !isParent(entry) && !selected.value.includes(entry.path) ? [entry] : selectedEntries.value;
+		if (!entry || isParent(entry)) return [];
+		return selected.value.includes(entry.path) ? selectedEntries.value : [entry];
 	}
 
 	function prepareContext(entry?: FileEntry) {
@@ -171,63 +187,58 @@
 					: undefined;
 
 	function entryItems(entry?: FileEntry): UiMenuItem[] {
-		const entries = targets(entry),
-			has = entries.length > 0;
+		const entries = targets(entry);
+		const first = entries[0];
+		const single = entries.length === 1;
+		const noTargets = !entries.length;
 		return [
 			...(entry?.kind === 'directory' || entry?.kind === 'link'
 				? [{ id: 'open', label: t('openDirectory'), icon: Folder }]
 				: []),
 			{ id: 'file', label: t('file'), icon: FilePlus },
 			{ id: 'mkdir', label: t('mkdir'), icon: FolderPlus },
-			...(has && !isParent(entry)
-				? [
-						{ id: 'copy', label: t('filesMenu.copy'), icon: Copy, separatorBefore: true },
-						{ id: 'cut', label: t('filesMenu.cut'), icon: Scissors },
-					]
-				: []),
+			{ id: 'copy', label: t('filesMenu.copy'), icon: Copy, disabled: noTargets, separatorBefore: true },
+			{ id: 'cut', label: t('filesMenu.cut'), icon: Scissors, disabled: noTargets },
 			{
 				id: 'paste',
 				label: t('filesMenu.paste'),
 				icon: ClipboardPaste,
 				disabled: !shared.clipboard.value,
-				separatorBefore: !has,
 			},
-			...(has && !isParent(entry)
-				? [
-						{ id: 'send', label: t('filesMenu.send'), icon: Send },
-						{
-							id: 'compress',
-							label: t('filesMenu.compress'),
-							icon: Archive,
-							separatorBefore: true,
-						},
-						...(entries.length === 1 && archiveFormat(entries[0].name)
-							? [{ id: 'extract', label: t('filesMenu.extract'), icon: Archive }]
-							: []),
-						{ id: 'permissions', label: t('filesMenu.permissions'), icon: Shield },
-						...(entries.length === 1
-							? [
-									{ id: 'rename', label: t('rename'), icon: Pencil },
-									...(entries[0].kind !== 'directory'
-										? [{ id: 'download', label: t('download'), icon: Download }]
-										: []),
-								]
-							: []),
-						{
-							id: 'remove',
-							label: t('remove'),
-							icon: Trash2,
-							tone: 'danger' as const,
-							separatorBefore: true,
-						},
-					]
+			{ id: 'send', label: t('filesMenu.send'), icon: Send, disabled: noTargets },
+			{
+				id: 'compress',
+				label: t('filesMenu.compress'),
+				icon: Archive,
+				disabled: noTargets,
+				separatorBefore: true,
+			},
+			...(single && archiveFormat(first.name)
+				? [{ id: 'extract', label: t('filesMenu.extract'), icon: Archive }]
 				: []),
+			{ id: 'permissions', label: t('filesMenu.permissions'), icon: Shield, disabled: noTargets },
+			{ id: 'rename', label: t('rename'), icon: Pencil, disabled: !single },
+			{ id: 'download', label: t('download'), icon: Download, disabled: !single || first.kind === 'directory' },
+			{
+				id: 'remove',
+				label: t('remove'),
+				icon: Trash2,
+				disabled: noTargets,
+				tone: 'danger',
+				separatorBefore: true,
+			},
 			{ id: 'copyPath', label: t('copyPath'), icon: Copy, separatorBefore: true },
 		];
 	}
 
 	async function menuAction(id: string, entry = context.value) {
-		if (!props.enabled || busy.value) return;
+		if (
+			!props.enabled ||
+			!loaded.value ||
+			busy.value ||
+			!entryItems(entry).some((item) => item.id === id && !item.disabled)
+		)
+			return;
 		const entries = targets(entry),
 			directory = entry?.kind === 'directory' ? entry.path : path.value;
 		if (id === 'open' && entry) await files.load(entry.path);
@@ -247,7 +258,8 @@
 			}
 		} else if (id === 'file' || id === 'mkdir') operations.open(id, [], directory);
 		else if (id === 'compress') operations.open('compress', entries, path.value);
-		else if (id === 'extract') operations.open('extract', entries, path.value, archiveFormat(entries[0].name));
+		else if (id === 'extract' && entries[0])
+			operations.open('extract', entries, path.value, archiveFormat(entries[0].name));
 		else if (id === 'rename' || id === 'remove' || id === 'permissions' || id === 'send')
 			operations.open(id, entries, path.value);
 	}
@@ -334,6 +346,7 @@
 						];
 				if (next) {
 					selected.value = [next.path];
+					prefetchEntry(next);
 					nextTick(() =>
 						surface.value
 							?.querySelector<HTMLElement>('[aria-pressed="true"]')
@@ -390,6 +403,7 @@
 					appearance="ghost"
 					icon-only
 					:aria-label="t('refreshFiles')"
+					:title="t('refreshFiles')"
 					:loading="loading"
 					:disabled="!enabled"
 					@click="files.load()"
@@ -399,6 +413,7 @@
 					appearance="ghost"
 					icon-only
 					:aria-label="t('searchFiles')"
+					:title="t('searchFiles')"
 					:disabled="!enabled || !loaded"
 					@click="showSearch"
 					><Search :size="16"
@@ -410,13 +425,14 @@
 						{ id: 'modified', label: t('sortModified') },
 					]"
 					@select="sort = $event"
-					><UiButton appearance="ghost" icon-only :aria-label="t('sortFiles')"
+					><UiButton appearance="ghost" icon-only :aria-label="t('sortFiles')" :title="t('sortFiles')"
 						><ListFilter :size="16" /></UiButton
 				></UiDropdownMenu>
 				<UiButton
 					appearance="ghost"
 					icon-only
 					:aria-label="t('showHidden')"
+					:title="t('showHidden')"
 					:aria-pressed="showHidden"
 					@click="showHidden = !showHidden"
 					><component :is="showHidden ? Eye : EyeOff" :size="16"
@@ -425,6 +441,7 @@
 					appearance="ghost"
 					icon-only
 					:aria-label="t('filesMenu.terminalToFiles')"
+					:title="t('filesMenu.terminalToFiles')"
 					:loading="syncing === 'toTerminal'"
 					:disabled="!enabled || !loaded || !!syncing"
 					@click="synchronize('toTerminal')"
@@ -434,6 +451,7 @@
 					appearance="ghost"
 					icon-only
 					:aria-label="t('filesMenu.filesToTerminal')"
+					:title="t('filesMenu.filesToTerminal')"
 					:loading="syncing === 'fromTerminal'"
 					:disabled="!enabled || !!syncing"
 					@click="synchronize('fromTerminal')"
@@ -446,77 +464,95 @@
 				@submit.prevent="browserSearch.search()"
 				@keydown.esc.stop.prevent="closeSearch"
 			>
-				<UiButton type="submit" appearance="ghost" icon-only :aria-label="t('searchFiles')" :loading="searching"
+				<UiButton
+					type="submit"
+					appearance="ghost"
+					icon-only
+					:aria-label="t('searchFiles')"
+					:title="t('searchFiles')"
+					:loading="searching"
 					><Search :size="16"
 				/></UiButton>
 				<div class="workspace-file-search-input">
 					<UiInput v-model="search" :aria-label="t('searchFiles')" :placeholder="t('searchFiles')" />
 				</div>
-				<UiButton appearance="ghost" icon-only :aria-label="t('closeSearch')" @click="closeSearch"
+				<UiButton
+					appearance="ghost"
+					icon-only
+					:aria-label="t('closeSearch')"
+					:title="t('closeSearch')"
+					@click="closeSearch"
 					><X :size="16"
 				/></UiButton>
 			</form>
+			<PathFavorites :path="path" :enabled="enabled && loaded" :i18n="i18n" @navigate="files.load($event)" />
 		</div>
-		<form class="workspace-file-path" @submit.prevent="files.load(pathInput)">
-			<UiInput v-model="pathInput" :aria-label="t('path')" :disabled="!enabled" /><PathFavorites
-				:path="path"
-				:enabled="enabled && loaded"
-				:i18n="i18n"
-				@navigate="files.load($event)"
-			/>
-		</form>
+		<WorkspacePathBar
+			:ctx="ctx"
+			:signal="signal"
+			:i18n="i18n"
+			:path="path"
+			:loaded="loaded"
+			:enabled="enabled"
+			:navigate="files.load"
+		/>
 		<p v-if="browserSearch.active.value && truncated" class="workspace-search-limit">
 			{{ t('searchTruncated') }}
 		</p>
-		<UiContextMenu
-			:items="entryItems(context)"
-			:disabled="!enabled || !loaded || mutating"
-			@select="menuAction($event, context)"
-		>
-			<div
-				class="workspace-file-list"
-				:aria-busy="loading || searching"
-				tabindex="0"
-				@pointerdown.capture="context = undefined"
-				@contextmenu.capture="context = undefined"
+		<div class="workspace-file-viewport">
+			<UiContextMenu
+				:items="entryItems(context)"
+				:disabled="!enabled || !loaded || mutating"
+				@select="menuAction($event, context)"
 			>
-				<button
-					v-for="entry in visibleRows"
-					:key="entry.path"
-					class="workspace-file-row workspace-file-main"
-					:class="{
-						'is-selected': selected.includes(entry.path),
-						'is-cut':
-							shared.clipboard.value?.operation === 'cut' &&
-							shared.clipboard.value.sourceSessionId === sessionId &&
-							shared.clipboard.value.paths.includes(entry.path),
-					}"
-					:aria-label="isParent(entry) ? t('parentDirectory') : displayName(entry)"
-					:aria-pressed="selected.includes(entry.path)"
-					:disabled="!enabled"
-					@click="select(entry, $event)"
-					@contextmenu="prepareContext(entry)"
-					@pointerdown="context = entry"
+				<div
+					class="workspace-file-list"
+					:style="fileScaleStyle"
+					:aria-busy="loading || searching"
+					tabindex="0"
+					@pointerdown.capture="context = undefined"
+					@contextmenu.capture="context = undefined"
 				>
-					<FileIcon :name="entry.name" :kind="entry.kind" /><span
-						class="workspace-file-name"
-						:title="displayName(entry)"
-						>{{ displayName(entry) }}</span
-					><span class="workspace-file-size">{{
-						isParent(entry)
-							? t('parentDirectory')
-							: entry.kind === 'directory'
-								? t('directory')
-								: size(entry.size)
-					}}</span>
-				</button>
-				<UiEmptyState
-					v-if="loaded && !rows.length && !searching"
-					:title="t(browserSearch.active.value ? 'noFilesMatch' : 'emptyDirectory')"
-					:icon="Folder"
-				/>
-			</div>
-		</UiContextMenu>
+					<button
+						v-for="entry in visibleRows"
+						:key="entry.path"
+						class="workspace-file-row"
+						:class="{
+							'is-selected': selected.includes(entry.path),
+							'is-cut':
+								shared.clipboard.value?.operation === 'cut' &&
+								shared.clipboard.value.sourceSessionId === sessionId &&
+								shared.clipboard.value.paths.includes(entry.path),
+						}"
+						:aria-label="isParent(entry) ? t('parentDirectory') : displayName(entry)"
+						:aria-pressed="selected.includes(entry.path)"
+						:disabled="!enabled"
+						@click="select(entry, $event)"
+						@contextmenu="prepareContext(entry)"
+						@pointerdown="context = entry"
+						@pointerenter="prefetchEntry(entry, $event)"
+						@pointerleave="files.cancelPrefetch"
+					>
+						<FileIcon :name="entry.name" :kind="entry.kind" /><span
+							class="workspace-file-name"
+							:title="displayName(entry)"
+							>{{ displayName(entry) }}</span
+						><span class="workspace-file-size">{{
+							isParent(entry)
+								? t('parentDirectory')
+								: entry.kind === 'directory'
+									? t('directory')
+									: size(entry.size)
+						}}</span>
+					</button>
+					<UiEmptyState
+						v-if="loaded && !rows.length && !searching"
+						:title="t(browserSearch.active.value ? 'noFilesMatch' : 'emptyDirectory')"
+						:icon="Folder"
+					/>
+				</div>
+			</UiContextMenu>
+		</div>
 		<div v-if="isOverDropZone && enabled && loaded && !busy" class="workspace-file-drop" aria-hidden="true">
 			<Upload :size="30" /><span>{{ t('dropFiles') }}</span>
 		</div>
@@ -533,7 +569,7 @@
 		padding: 6px;
 		gap: 5px;
 	}
-	.workspace-file-tools .ui-button {
+	.workspace-file-tools :deep(.ui-button) {
 		--ui-button-height: 30px;
 		width: 30px;
 		min-width: 30px;
@@ -541,7 +577,7 @@
 		border: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
 		border-radius: 7px;
 	}
-	.workspace-file-tools .ui-button[aria-pressed='true'] {
+	.workspace-file-tools :deep(.ui-button[aria-pressed='true']) {
 		color: var(--ui-primary);
 		background: color-mix(in srgb, var(--ui-primary) 10%, transparent);
 	}
@@ -549,7 +585,7 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		width: 100%;
+		flex: 1;
 		min-width: 0;
 	}
 	.workspace-file-search-input {
@@ -561,8 +597,14 @@
 		width: 100%;
 		font-size: 12px;
 	}
+	.workspace-file-viewport {
+		flex: 1 1 0;
+		min-height: 0;
+		overflow: clip;
+	}
 	.workspace-file-list {
-		flex: 1;
+		box-sizing: border-box;
+		container: workspace-files / inline-size;
 		min-height: 0;
 		padding: 4px 6px;
 	}
@@ -592,6 +634,14 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	@container workspace-files (max-width: 300px) {
+		.workspace-file-row {
+			grid-template-columns: 18px minmax(0, 1fr);
+		}
+		.workspace-file-size {
+			display: none;
+		}
 	}
 	.workspace-file-drop {
 		position: absolute;

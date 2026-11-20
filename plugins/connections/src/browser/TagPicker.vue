@@ -18,7 +18,14 @@
 	import type { Tag } from '../shared/connection-types';
 	import { useConnections } from './connections-view.js';
 	const selected = defineModel<string[]>({ required: true });
-	const props = defineProps<{ tags: Tag[]; disabled?: boolean; signal: AbortSignal; view: PluginWindowApi }>();
+	const props = defineProps<{
+		tags: Tag[];
+		inputId: string;
+		inputDescribedBy?: string;
+		disabled?: boolean;
+		signal: AbortSignal;
+		view: PluginWindowApi;
+	}>();
 	const emit = defineEmits<{
 		deleted: [id: string, name: string];
 		overlayChange: [open: boolean];
@@ -38,11 +45,12 @@
 
 	const normalize = (value: string) => value.normalize('NFKC').trim().toLowerCase();
 
-	const choices = computed(() =>
-		Array.from(new Set([...props.tags.map((tag) => tag.name), ...selected.value])).filter((name) =>
-			normalize(name).includes(normalize(query.value)),
-		),
-	);
+	const choices = computed(() => {
+		const saved = new Map(props.tags.map((tag) => [tag.name, tag]));
+		return [...new Set([...saved.keys(), ...selected.value])]
+			.filter((name) => normalize(name).includes(normalize(query.value)))
+			.map((name) => ({ name, tag: saved.get(name) }));
+	});
 	const create = computed(
 		() =>
 			query.value.trim().length > 0 &&
@@ -63,7 +71,7 @@
 	}
 
 	async function remove() {
-		if (!pending.value) return;
+		if (!pending.value || deleting.value) return;
 		const tag = pending.value;
 		deleting.value = true;
 		try {
@@ -104,9 +112,10 @@
 			<ComboboxAnchor class="connections-tag-anchor">
 				<ComboboxInput
 					v-model="query"
+					:id="inputId"
+					:aria-describedby="inputDescribedBy"
 					class="connections-tag-input"
 					:placeholder="t('tagPlaceholder')"
-					:aria-label="t('tags')"
 					:maxlength="40"
 					@click="open = true"
 				/>
@@ -128,19 +137,22 @@
 					"
 				>
 					<ComboboxViewport>
-						<div v-for="name in choices" :key="name" class="connections-tag-option-row">
+						<div v-for="{ name, tag } in choices" :key="name" class="connections-tag-option-row">
 							<ComboboxItem :value="name" class="connections-tag-option"
 								><span>{{ name }}</span
 								><ComboboxItemIndicator><Check :size="14" /></ComboboxItemIndicator
 							></ComboboxItem>
 							<UiButton
-								v-if="tags.some((tag) => tag.name === name)"
+								v-if="tag"
+								type="button"
+								class="connections-tag-delete"
 								appearance="ghost"
 								density="compact"
 								icon-only
 								:aria-label="t('removeTag', { name })"
-								@pointerdown.stop
-								@click.stop="confirmDelete(tags.find((tag) => tag.name === name)!)"
+								:title="t('removeTag', { name })"
+								@pointerdown.stop.prevent
+								@click.stop="confirmDelete(tag)"
 								><Trash2 :size="14"
 							/></UiButton>
 						</div>

@@ -17,8 +17,9 @@
 					<p>{{ i18n.t('general.hint') }}</p>
 				</div>
 			</header>
-			<UiField :label="i18n.t('general.echoMode')">
+			<UiField :label="i18n.t('general.echoMode')" v-slot="field">
 				<UiSelect
+					:id="field.id"
 					:model-value="catalog.state.value.preferences.localEcho"
 					:aria-label="i18n.t('general.localEcho')"
 					:disabled="!catalog.loaded.value"

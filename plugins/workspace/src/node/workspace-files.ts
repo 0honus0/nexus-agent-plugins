@@ -118,10 +118,28 @@ export function createWorkspaceFiles(connection: SshConnectionApi, onTransfers: 
 			}
 		},
 
-		async list(path: string): Promise<RemoteDirectory> {
+		async list(path: string, signal?: AbortSignal): Promise<RemoteDirectory> {
+			signal?.throwIfAborted();
 			const sftp = await client();
-			const canonical = await promisify(sftp.realpath.bind(sftp))(path);
-			const entries = await promisify(sftp.readdir.bind(sftp))(canonical);
+			signal?.throwIfAborted();
+			const realpath = promisify(sftp.realpath.bind(sftp));
+			const readdir = promisify(sftp.readdir.bind(sftp));
+			let canonical: string;
+			let entries: Awaited<ReturnType<typeof readdir>>;
+			if (posix.isAbsolute(path) && posix.normalize(path) === path) {
+				const [resolved, directory] = await Promise.allSettled([realpath(path), readdir(path)]);
+				signal?.throwIfAborted();
+				if (resolved.status === 'rejected') throw resolved.reason;
+				canonical = resolved.value;
+				if (directory.status === 'fulfilled') entries = directory.value;
+				else if (canonical !== path) entries = await readdir(canonical);
+				else throw directory.reason;
+			} else {
+				canonical = await realpath(path);
+				signal?.throwIfAborted();
+				entries = await readdir(canonical);
+			}
+			signal?.throwIfAborted();
 			return {
 				path: canonical,
 				entries: entries
@@ -144,7 +162,7 @@ export function createWorkspaceFiles(connection: SshConnectionApi, onTransfers: 
 		},
 
 		search(path: string, query: string, signal: AbortSignal) {
-			return searchRemoteFiles(this.list, path, query, signal);
+			return searchRemoteFiles((remote) => this.list(remote, signal), path, query, signal);
 		},
 
 		async mutate(input: FileMutation) {

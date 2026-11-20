@@ -1,0 +1,53 @@
+export const messages = {
+	en: {
+		title: 'Passkeys',
+		add: 'Add passkey',
+		name: 'Passkey name',
+		namePlaceholder: 'For example, work laptop',
+		remove: 'Remove',
+		cancel: 'Cancel',
+		removeTitle: 'Remove passkey?',
+		empty: 'No passkeys registered',
+		secureOrigin: 'Open Nexus over HTTPS or localhost to use passkeys.',
+	},
+	zh: {
+		title: '通行密钥',
+		add: '添加通行密钥',
+		name: '通行密钥名称',
+		namePlaceholder: '例如，办公电脑',
+		remove: '移除',
+		cancel: '取消',
+		removeTitle: '移除通行密钥？',
+		empty: '还没有登记通行密钥',
+		secureOrigin: '请通过 HTTPS 或 localhost 打开 Nexus 以使用通行密钥。',
+	},
+};
+
+export const notices = {
+	en: {
+		PASSKEY_OPERATION_FAILED: 'The passkey operation failed.',
+		PASSKEY_UNAVAILABLE: 'Passkeys require a supported browser and HTTPS or localhost.',
+		PASSKEY_CANCELLED: 'The passkey request was cancelled or timed out.',
+		PASSKEY_CHALLENGE_EXPIRED: 'The passkey request expired. Try again.',
+		PASSKEY_LOGIN_FAILED: 'No matching passkey could be verified for this site.',
+		PASSKEY_REGISTRATION_FAILED: 'Could not verify the new passkey.',
+		PASSKEY_ALREADY_REGISTERED: 'This passkey is already registered.',
+		PASSKEY_BUSY: 'Too many passkey requests. Try again shortly.',
+		PASSKEY_NOT_FOUND: 'The passkey no longer exists.',
+		PASSKEY_ADDED: 'Passkey added.',
+		PASSKEY_REMOVED: 'Passkey removed.',
+	},
+	zh: {
+		PASSKEY_OPERATION_FAILED: '通行密钥操作失败。',
+		PASSKEY_UNAVAILABLE: '通行密钥需要受支持的浏览器，并通过 HTTPS 或 localhost 使用。',
+		PASSKEY_CANCELLED: '通行密钥请求已取消或超时。',
+		PASSKEY_CHALLENGE_EXPIRED: '通行密钥请求已过期，请重试。',
+		PASSKEY_LOGIN_FAILED: '无法验证此站点对应的通行密钥。',
+		PASSKEY_REGISTRATION_FAILED: '无法验证新的通行密钥。',
+		PASSKEY_ALREADY_REGISTERED: '此通行密钥已登记。',
+		PASSKEY_BUSY: '通行密钥请求过多，请稍后再试。',
+		PASSKEY_NOT_FOUND: '此通行密钥已不存在。',
+		PASSKEY_ADDED: '通行密钥已添加。',
+		PASSKEY_REMOVED: '通行密钥已移除。',
+	},
+};

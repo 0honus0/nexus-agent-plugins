@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { backupPath, pluginFixture, setEnabled, startHost, until } from '../../test/tests/host.js';
+import { collectBrowserErrors, expectFormFields } from '../../test/tests/browser-checks.js';
 import { z } from 'zod';
 import { CredentialSchema } from '../../credentials/src/shared/credentials-types.js';
 import { ConnectionCatalogSchema, ConnectionSchema } from '../src/shared/connection-types.js';
@@ -81,12 +82,28 @@ test(
 		const browser = await chromium.launch();
 		resources.defer(() => browser.close());
 		const page = await browser.newPage({ locale: 'en-US' });
+		const browserErrors = collectBrowserErrors(page);
 		page.setDefaultTimeout(8000);
+		const requested = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		let catalogRequests = 0;
+		await page.route('**' + base + '/catalog', async (route) => {
+			catalogRequests++;
+			requested.resolve();
+			await release.promise;
+			await route.fallback();
+		});
 		await page.goto(host.origin);
 		await page.getByRole('textbox', { name: 'Username' }).fill('owner');
 		await page.locator('input[type=password]').fill('sdk-fixture-password');
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 		const tile = page.locator('[data-tile="@nexus-terminal/connections:applications:main"]');
+		try {
+			await requested.promise;
+			await expect(tile).toHaveCount(0);
+		} finally {
+			release.resolve();
+		}
 		await expect(tile.locator('.connections-tile__total strong')).toHaveText('3');
 		await expect(tile.locator('[data-type="ssh"] strong')).toHaveText('1');
 
@@ -107,9 +124,16 @@ test(
 		await expect(app.getByText('SSH fixture')).toBeVisible();
 		await expect(app.getByText('RDP fixture')).toBeVisible();
 		await expect(app.getByText('VNC fixture')).toBeVisible();
+		expect(catalogRequests).toBe(1);
 
 		await app.getByRole('button', { name: 'Add connection', exact: true }).click();
 		const dialog = page.getByRole('dialog', { name: 'Add connection' });
+		await dialog
+			.locator('label[for]')
+			.filter({ hasText: /^Tags$/u })
+			.click();
+		await expect(dialog.getByRole('combobox', { name: 'Tags', exact: true })).toBeFocused();
+		await expectFormFields(dialog);
 		await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Browser connection');
 		await dialog.getByRole('textbox', { name: 'Host', exact: true }).fill('browser.example.test');
 		await dialog.getByRole('button', { name: 'Add credential', exact: true }).click();
@@ -119,12 +143,20 @@ test(
 		await manager.getByRole('button', { name: 'Close application' }).click();
 		await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Browser connection');
 		await expect(dialog.getByRole('textbox', { name: 'Host', exact: true })).toHaveValue('browser.example.test');
+		await dialog.getByRole('button', { name: 'Tags', exact: true }).click();
+		await dialog.getByRole('button', { name: 'Delete tag “' + catalog.tags[0].name + '”' }).click();
+		const deleteTag = page.getByRole('dialog', { name: 'Delete tag', exact: true });
+		await deleteTag.getByRole('button', { name: 'Delete', exact: true }).click();
+		await expect(deleteTag).toHaveCount(0);
 		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(app.getByText('Browser connection')).toBeVisible();
-		await expect(page.locator('[data-ui="toast"]').getByText('Connection saved.')).toBeVisible();
+		for (const message of ['Connection saved.', 'Tag deleted.']) {
+			const toast = page.locator('[data-ui="toast"]').filter({ hasText: message });
+			await toast.locator('.ui-toast__close').click();
+			await expect(toast).toHaveCount(0);
+		}
 		await expect(tile.locator('.connections-tile__total strong')).toHaveText('4');
 
-		assert.equal((await host.request(base + '/tags/' + catalog.tags[0].id, { method: 'DELETE' })).status, 204);
 		assert.deepEqual(ConnectionSchema.parse(await host.json(connections + '/' + ssh.id)).tags, []);
 		assert.equal((await host.request(connections + '/' + ssh.id, { method: 'DELETE' })).status, 204);
 		assert.equal((await host.request(credentials + '/' + linked, { method: 'DELETE' })).status, 204);
@@ -177,5 +209,6 @@ test(
 		await host.json(credentials + '/' + linked, undefined, 'DELETE', 409);
 		await setEnabled(host, pluginId, false);
 		await expect(tile.locator('.connections-tile')).toHaveCount(0);
+		expect(browserErrors).toEqual([]);
 	},
 );

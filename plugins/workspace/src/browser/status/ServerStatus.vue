@@ -35,17 +35,14 @@
 	type ResourceMetric = 'cpu' | 'memory' | 'swap' | 'disk';
 	type StatusMetric = ResourceMetric | 'network';
 
-	const props = withDefaults(
-		defineProps<{
-			ctx: PluginContextApi;
-			sessionId: string;
-			enabled: boolean;
-			connected?: boolean;
-			host?: string;
-			i18n: WorkspaceI18n;
-		}>(),
-		{ connected: true },
-	);
+	const props = defineProps<{
+		ctx: PluginContextApi;
+		sessionId: string;
+		enabled: boolean;
+		connecting: boolean;
+		host?: string;
+		i18n: WorkspaceI18n;
+	}>();
 	const { t } = props.i18n;
 	const state = useServerStatus(props);
 	// The current remote-tools contract uses bytes; the legacy presentation uses MiB/KiB.
@@ -66,12 +63,14 @@
 		}),
 	};
 	const scaleRoot = ref<HTMLElement>();
-	const { scale: localScale, style: scaleStyle } = usePanePresentation(scaleRoot, statusPresentation);
+	const { scale: localScale, style: paneStyle } = usePanePresentation(scaleRoot, statusPresentation);
+	const scaleStyle = computed(() => ({ ...paneStyle.value, '--status-scale': localScale.value }));
 	const selectedMetric = ref<StatusMetric | null>(null);
 	const historyRange = ref<1 | 5 | 10 | 30>(5);
 	const ranges = [1, 5, 10, 30] as const;
 	const hasVisibleData = computed(() => Boolean(monitor.current.value && !monitor.error.value));
-	const awaitingSample = computed(() => props.enabled && !monitor.current.value && !monitor.error.value);
+	const loading = computed(() => props.connecting || monitor.loading.value);
+	const awaitingSample = computed(() => loading.value && !hasVisibleData.value);
 
 	async function copyHost() {
 		if (!props.host) return;
@@ -318,18 +317,21 @@
 			<section v-else-if="monitor.current.value" class="monitor-panel">
 				<header class="monitor-header">
 					<strong>{{ t('monitor.title') }}</strong>
+					<span v-if="loading" class="live-state" role="status" :aria-label="t('monitor.loading')">
+						<LoaderCircle class="status-loading-spinner" :size="12" aria-hidden="true" />
+					</span>
 					<button
-						v-if="host"
+						v-else-if="host"
 						type="button"
 						class="live-state host-button status-touch-target"
 						:title="t('monitor.copyHost')"
 						:aria-label="t('monitor.copyHost') + ': ' + host"
 						@click="copyHost"
 					>
-						<i class="status-dot"></i>
+						<i v-if="monitor.available.value" class="status-dot"></i>
 						<span class="host-name">{{ host }}</span>
 					</button>
-					<span v-else class="live-state"
+					<span v-else-if="monitor.available.value" class="live-state"
 						><i class="status-dot"></i><span class="live-label">{{ t('monitor.live') }}</span></span
 					>
 				</header>

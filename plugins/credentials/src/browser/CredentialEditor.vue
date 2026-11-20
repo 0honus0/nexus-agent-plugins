@@ -78,7 +78,6 @@
 </script>
 <template>
 	<UiDialog
-		class="credentials-editor"
 		:open="true"
 		:title="t(credential ? 'edit' : 'add')"
 		:close-label="t('close')"
@@ -88,25 +87,19 @@
 		@update:open="(value) => !value && emit('close')"
 	>
 		<form :id="form" class="credentials-form" @submit.prevent="save">
-			<div class="credentials-form-pair">
-				<UiField :label="t('name')" v-slot="f"
-					><UiInput
-						v-model="draft.name"
-						:id="f.id"
-						required
-						maxlength="120"
-						autofocus
-						:disabled="saving" /></UiField
-				><UiField :label="t('username')" v-slot="f"
-					><UiInput
-						v-model="draft.username"
-						:id="f.id"
-						required
-						maxlength="120"
-						autocomplete="off"
-						:disabled="saving"
-				/></UiField>
-			</div>
+			<UiField :label="t('name')" v-slot="f">
+				<UiInput v-model="draft.name" :id="f.id" required maxlength="120" autofocus :disabled="saving" />
+			</UiField>
+			<UiField :label="t('username')" v-slot="f">
+				<UiInput
+					v-model="draft.username"
+					:id="f.id"
+					required
+					maxlength="120"
+					autocomplete="off"
+					:disabled="saving"
+				/>
+			</UiField>
 			<UiField :label="t('type')" v-slot="f"
 				><UiSelect v-model="draft.type" :id="f.id" :options="types" block :disabled="saving"
 			/></UiField>
@@ -137,11 +130,14 @@
 						:placeholder="changedType ? '' : t('keepSecret')"
 					/>
 				</UiField>
-				<input ref="file" type="file" hidden @change="upload" /><UiButton
-					class="credentials-upload"
-					:disabled="saving"
-					appearance="soft"
-					@click="file?.click()"
+				<input
+					ref="file"
+					:id="form + '-key-file'"
+					:aria-label="t('upload')"
+					type="file"
+					hidden
+					@change="upload"
+				/><UiButton block :disabled="saving" appearance="soft" @click="file?.click()"
 					><Upload :size="16" />{{ t('upload') }}</UiButton
 				>
 				<UiField :label="t('passphrase')" :hint="changedType ? '' : t('keepSecret')" v-slot="f"
@@ -153,7 +149,9 @@
 						autocomplete="new-password"
 				/></UiField>
 				<label v-if="credential?.hasPassphrase" class="credentials-clear"
-					><input v-model="clear" type="checkbox" :disabled="saving" />{{ t('clearPassphrase') }}</label
+					><input v-model="clear" :id="form + '-clear-passphrase'" type="checkbox" :disabled="saving" />{{
+						t('clearPassphrase')
+					}}</label
 				></template
 			>
 		</form>

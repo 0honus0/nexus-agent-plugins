@@ -9,6 +9,10 @@ export const WorkspaceToolSchema = WorkspacePaneSchema.or(z.enum(['keyboard', 't
 
 export type WorkspaceTool = z.infer<typeof WorkspaceToolSchema>;
 
+export const workspacePaneScale = { min: 0.65, max: 1.6, step: 0.1 } as const;
+
+const PaneScaleSchema = z.number().finite().min(workspacePaneScale.min).max(workspacePaneScale.max);
+
 const PanelSchema = z.object({
 	id: WorkspacePaneSchema,
 	contentComponent: WorkspacePaneSchema,
@@ -78,7 +82,7 @@ export const WorkspaceLayoutSchema = z.object({
 	version: z.literal(4),
 	tools: z.partialRecord(WorkspaceToolSchema, z.boolean()).optional(),
 	/** Per-width-profile presentation choices. */
-	scales: z.object({ status: z.number().finite().min(0.65).max(1.6).optional() }).optional(),
+	scales: z.object({ status: PaneScaleSchema.optional(), files: PaneScaleSchema.optional() }).optional(),
 	locked: z.boolean(),
 	dock: WorkspaceDockSchema,
 });

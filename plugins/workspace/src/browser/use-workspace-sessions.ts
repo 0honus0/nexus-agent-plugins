@@ -1,7 +1,7 @@
 import { ref, shallowRef, computed, onScopeDispose, watch } from 'vue';
 import { PluginHttpError, type PluginContextApi } from 'nexus-terminal/browser';
 import type { PluginWindowApi } from 'nexus-terminal/browser';
-import type { ConnectionsClientApi } from '@nexus-terminal/connections/connections-client-api';
+import type { Connection, ConnectionsClientApi } from '@nexus-terminal/connections/connections-client-api';
 import {
 	SessionListResponseSchema,
 	SessionCreateResultSchema,
@@ -29,11 +29,23 @@ export function useWorkspaceSessions(props: {
 	const { request, report } = createWorkspaceClient(props.ctx, signal);
 	const ownerClient = createWorkspaceClient(props.ctx, props.ctx.signal);
 	const busySessions = ref<Record<string, boolean>>({});
-	const connectionsLoaded = computed(() => connections.value?.loaded.value ?? false);
+	const connectionsLoaded = computed(() => readConnectionsState(false, (client) => client.loaded.value));
 	const connectionsReadFailed = ref(false);
 	let readConnections: (() => Promise<void>) | undefined;
 	const confirmOpen = ref(false);
 	let resolveConfirmation: ((value: boolean) => void) | undefined;
+
+	function readConnectionsState<Value>(fallback: Value, read: (client: ConnectionsClientApi) => Value): Value {
+		const client = connections.value;
+		if (!client) return fallback;
+		try {
+			return read(client);
+		} catch (cause) {
+			// Older hosts can invalidate the proxy before aborting the binding.
+			if (cause instanceof Error && 'code' in cause && cause.code === 'PLUGIN_SERVICE_EXPIRED') return fallback;
+			throw cause;
+		}
+	}
 
 	const hasTransfers = (id?: string) =>
 		props.hasTransfers?.(id) ||
@@ -65,10 +77,27 @@ export function useWorkspaceSessions(props: {
 			);
 	});
 	const stop = props.ctx.use({ connections: ['@nexus-terminal/connections', 'connections'] }, (scope) => {
-		const client = scope.plugin.connections;
 		const readSignal = AbortSignal.any([signal, scope.signal]);
+		if (readSignal.aborted) return;
+		const client = scope.plugin.connections;
+
+		function forgetConnection() {
+			if (connections.value !== client) return;
+			readConnections = undefined;
+			connectionsReadFailed.value = false;
+			connections.value = undefined;
+		}
+
+		// Service proxies already reject reads when aborted. Drop the reference before
+		// Vue evaluates a watcher, without waiting for asynchronous scope disposal.
+		readSignal.addEventListener('abort', forgetConnection, { once: true });
+		scope.onDispose(() => {
+			readSignal.removeEventListener('abort', forgetConnection);
+			forgetConnection();
+		});
 		connections.value = client;
 		readConnections = async () => {
+			if (readSignal.aborted) return;
 			connectionsReadFailed.value = false;
 			try {
 				await client.refresh(readSignal);
@@ -78,33 +107,36 @@ export function useWorkspaceSessions(props: {
 				report(cause);
 			}
 		};
-		void readConnections();
-		scope.onDispose(() => {
-			connections.value = undefined;
-			connectionsReadFailed.value = false;
-			readConnections = undefined;
-		});
+		if (!client.loaded.value) void readConnections();
 	});
 
 	function retryConnections(): void {
 		void readConnections?.();
 	}
 
+	function reconcileSessions(items: SessionInfo[]) {
+		sessions.value = items;
+		tabs.value = tabs.value.flatMap((tab) => {
+			const current = items.find((session) => session.id === tab.id && session.state !== 'suspended');
+			return current ? [current] : [];
+		});
+		busySessions.value = Object.fromEntries(
+			Object.entries(busySessions.value).filter(([id]) => tabs.value.some((session) => session.id === id)),
+		);
+		if (active.value !== 'home' && !tabs.value.some((tab) => tab.id === active.value))
+			active.value = tabs.value[0]?.id ?? 'home';
+	}
+
 	const stopState = props.ctx.app.state.subscribe(
 		WorkspaceSessionsTopic,
 		SessionListResponseSchema,
 		{
-			updated({ items }) {
-				sessions.value = items;
-				tabs.value = tabs.value.flatMap((tab) => {
-					const current = sessions.value.find((s) => s.id === tab.id && s.state !== 'suspended');
-					return current ? [current] : [];
-				});
-				busySessions.value = Object.fromEntries(
-					Object.entries(busySessions.value).filter(([id]) => tabs.value.some((s) => s.id === id)),
-				);
-				if (active.value !== 'home' && !tabs.value.some((tab) => tab.id === active.value))
-					active.value = tabs.value[0]?.id ?? 'home';
+			updated: ({ items }) => reconcileSessions(items),
+
+			unconfirmed(reason) {
+				// The server retires all sessions when the topic is withdrawn.
+				// Preserve the tabs through an ordinary transport reconnect.
+				if (reason === 'unavailable') reconcileSessions([]);
 			},
 		},
 		signal,
@@ -116,7 +148,11 @@ export function useWorkspaceSessions(props: {
 		answer(false);
 		controller.abort();
 	});
-	const savedConnections = computed(() => connections.value?.catalog.value.connections ?? []);
+	const savedConnections = computed(() =>
+		readConnectionsState<Connection[]>([], (client) =>
+			client.catalog.value.connections.map((connection) => ({ ...connection, tags: [...connection.tags] })),
+		),
+	);
 	const suspended = computed(() => sessions.value.filter((s) => s.state === 'suspended'));
 	watch(savedConnections, (items) => {
 		if (selected.value && !items.some((c) => c.id === selected.value)) {

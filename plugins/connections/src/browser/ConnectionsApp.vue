@@ -109,7 +109,9 @@
 	}
 
 	const icons = { ssh: Terminal, rdp: Monitor, vnc: ScreenShare };
-	onMounted(refresh);
+	onMounted(() => {
+		if (!loaded.value) void refresh();
+	});
 
 	async function saved() {
 		editor.value = undefined;

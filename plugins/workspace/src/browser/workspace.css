@@ -105,7 +105,6 @@
 	min-width: 0;
 	min-height: 0;
 	background: var(--ui-surface);
-	container: workspace-files / size;
 	overflow: auto;
 }
 .workspace-file-path {
@@ -124,11 +123,6 @@
 .workspace-file-path input {
 	font-family: ui-monospace, monospace;
 	font-size: 12px;
-}
-.workspace-file-path .ui-button {
-	min-height: 32px;
-	min-width: 32px;
-	padding: 7px;
 }
 .workspace-file-list {
 	flex: 1 0 72px;
@@ -155,9 +149,9 @@
 	color: var(--ui-primary);
 }
 .workspace-file-size {
-	flex: none;
 	color: var(--ui-muted);
 	font-size: 11px;
+	white-space: nowrap;
 }
 
 .workspace-file-slot {
@@ -232,14 +226,32 @@
 .workspace-group-heading > svg:first-child {
 	color: var(--ui-primary);
 }
-.workspace-group-heading small,
+.workspace-group-heading > svg {
+	flex: none;
+}
+.workspace-group-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.workspace-group-heading .workspace-group-count {
+	flex: none;
+	justify-content: center;
+	min-width: 22px;
+	padding: 2px 6px;
+	border-radius: 6px;
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.25;
+}
 .workspace-suspended h3 > span {
 	color: var(--ui-muted);
 	font-size: 11px;
 	font-weight: 400;
 }
 .workspace-group-chevron {
-	margin-left: auto;
 	color: var(--ui-muted);
 	transition: transform var(--ui-motion-duration, 140ms);
 }
@@ -1016,7 +1028,7 @@
 	gap: 12px;
 	font-size: 12px;
 }
-.workspace-background-opacity label {
+.workspace-background-opacity > span {
 	white-space: nowrap;
 }
 .workspace-background-opacity .ui-slider {
@@ -1137,24 +1149,6 @@
 	}
 	.workspace-background-preview {
 		height: 150px;
-	}
-}
-
-/* Reflow the same information and actions; narrow panes never remove controls. */
-@container workspace-files (max-width: 300px) {
-	.workspace-file-main {
-		display: grid;
-		grid-template-columns: 20px minmax(0, 1fr);
-		gap: 4px 8px;
-	}
-	.workspace-file-size {
-		grid-column: 2;
-	}
-	.workspace-file-path {
-		flex-wrap: wrap;
-	}
-	.workspace-file-path > .ui-input {
-		flex-basis: 100%;
 	}
 }
 

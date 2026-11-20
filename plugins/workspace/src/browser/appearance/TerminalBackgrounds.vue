@@ -1,7 +1,7 @@
 <script setup lang="ts">
 	import { WorkspaceModuleError } from '../workspace-error';
 
-	import { computed, ref } from 'vue';
+	import { computed, ref, useId } from 'vue';
 	import { Image, Upload, Trash2, Plus, Check, Pencil, Download, Sparkles, Code } from '@lucide/vue';
 	import {
 		UiButton,
@@ -29,6 +29,7 @@
 	const { settings, state, imageUrl, html, animated, windowVisible, loaded, busy, overlayPreview } = background;
 	const imageInput = ref<HTMLInputElement>(),
 		htmlInput = ref<HTMLInputElement>();
+	const controlsId = useId();
 	const search = ref(''),
 		editing = ref(false),
 		copying = ref(false),
@@ -158,6 +159,8 @@
 			/>
 			<input
 				ref="imageInput"
+				:id="controlsId + '-image'"
+				:aria-label="t('background.uploadImage')"
 				type="file"
 				accept="image/png,image/jpeg,image/webp,image/gif"
 				hidden
@@ -165,14 +168,14 @@
 			/>
 		</div>
 		<div class="workspace-background-opacity">
-			<label>{{ t('background.overlay') }}</label>
+			<span :id="controlsId + '-overlay'">{{ t('background.overlay') }}</span>
 			<UiSlider
 				:model-value="settings.overlay"
 				:min="0"
 				:max="1"
 				:step="0.01"
 				:disabled="!loaded"
-				:aria-label="t('background.overlay')"
+				:aria-labelledby="controlsId + '-overlay'"
 				@update:model-value="overlayPreview = $event"
 				@commit="
 					overlayPreview = undefined;
@@ -205,7 +208,15 @@
 			<UiButton appearance="ghost" icon-only :aria-label="t('background.new')" :disabled="!loaded" @click="edit()"
 				><Plus :size="17"
 			/></UiButton>
-			<input ref="htmlInput" type="file" accept=".html,.htm,text/html" hidden @change="importHtml" />
+			<input
+				ref="htmlInput"
+				:id="controlsId + '-html'"
+				:aria-label="t('background.import')"
+				type="file"
+				accept=".html,.htm,text/html"
+				hidden
+				@change="importHtml"
+			/>
 		</div>
 		<div class="workspace-background-preset-grid">
 			<article
@@ -266,12 +277,12 @@
 		@update:open="editing = $event"
 	>
 		<div class="workspace-editor-form">
-			<UiField :label="t('tools.name')"><UiInput v-model="name" :aria-label="t('tools.name')" /></UiField
-			><UiField :label="t('background.html')">
+			<UiField :label="t('tools.name')" v-slot="field"><UiInput v-model="name" :id="field.id" /></UiField
+			><UiField :label="t('background.html')" v-slot="field">
 				<textarea
 					v-model="content"
+					:id="field.id"
 					class="workspace-code-input workspace-background-editor"
-					:aria-label="t('background.html')"
 					spellcheck="false"
 				/>
 			</UiField>

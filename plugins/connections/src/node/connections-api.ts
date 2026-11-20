@@ -64,6 +64,11 @@ export class Connections implements ConnectionsApi {
 		return catalog;
 	}
 
+	async listWithRevision() {
+		const revision = this.#revision;
+		return { ...(await this.list()), revision };
+	}
+
 	async get(id: string): Promise<Connection | undefined> {
 		this.#signal.throwIfAborted();
 		const value = await this.#storage.get(id);

@@ -1,16 +1,17 @@
 import { HttpFailure, type PluginContextApi, type PluginScopeApi } from 'nexus-terminal/node';
 import { z } from 'zod';
-import { ConnectionIdSchema, ConnectionUpdateSchema, ConnectionWriteSchema } from '../shared/connection-http-types.js';
-import { ConnectionCatalogSchema, ConnectionSchema } from '../shared/connection-types.js';
-import { ConnectionError, type ConnectionsApi } from './connections-api.js';
+import {
+	ConnectionCatalogResponseSchema,
+	ConnectionIdSchema,
+	ConnectionUpdateSchema,
+	ConnectionWriteSchema,
+} from '../shared/connection-http-types.js';
+import { ConnectionSchema } from '../shared/connection-types.js';
+import { ConnectionError, type Connections } from './connections-api.js';
 
 const empty = z.strictObject({});
 
-export function registerConnectionsHttp(
-	app: PluginContextApi['app'],
-	service: ConnectionsApi,
-	lifetime: PluginScopeApi,
-) {
+export function registerConnectionsHttp(app: PluginContextApi['app'], service: Connections, lifetime: PluginScopeApi) {
 	async function handle<Result>(run: () => Promise<Result>, signal: AbortSignal): Promise<Result> {
 		try {
 			signal.throwIfAborted();
@@ -31,10 +32,10 @@ export function registerConnectionsHttp(
 			method: 'get',
 			path: '/catalog',
 			input: empty,
-			output: ConnectionCatalogSchema,
+			output: ConnectionCatalogResponseSchema,
 			lifetime,
 
-			handler: (_, signal) => handle(() => service.list(), signal),
+			handler: (_, signal) => handle(() => service.listWithRevision(), signal),
 		},
 		{
 			method: 'get',

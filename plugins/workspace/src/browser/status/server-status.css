@@ -378,7 +378,7 @@ button.live-state:focus-visible {
 	grid-column: 2;
 	flex-direction: column;
 	justify-content: center;
-	gap: calc(16px / var(--status-scale, 1));
+	gap: calc(9px / var(--status-scale, 1));
 	width: 100%;
 	min-width: 0;
 	min-height: 0;
@@ -794,7 +794,7 @@ button.live-state:focus-visible {
 	overflow-wrap: anywhere;
 }
 
-@container status-content (max-width: 479px) and (min-height: 190px) {
+@container status-content (width < 480px) and (min-height: 190px) {
 	.metric-row {
 		column-gap: calc(7px / var(--status-scale, 1));
 	}
@@ -904,7 +904,7 @@ button.live-state:focus-visible {
 
 @container status-content (max-height: 270px) {
 	.metric-body {
-		gap: calc(8px / var(--status-scale, 1));
+		gap: calc(7px / var(--status-scale, 1));
 	}
 	.metric-track {
 		height: calc(12px / var(--status-scale, 1));
@@ -931,9 +931,8 @@ button.live-state:focus-visible {
 		padding-block: calc(2px / var(--status-scale, 1));
 	}
 }
-/* Compact summary is selected by available content space, including local zoom.
- * Keep these rules after the ultra-narrow detail rules; compact retains its icons. */
-@container status-content (max-width: 300px) or (max-height: 260px) {
+/* Keep the detailed layout in tall panes at every width, including when zoomed. */
+@container status-content (max-height: 210px) {
 	.status-loading-list,
 	.monitor-content:not(.has-history) {
 		padding-inline: min(0.3rem, 2cqw);
@@ -943,18 +942,11 @@ button.live-state:focus-visible {
 		grid-template-rows: repeat(4, minmax(0, 1fr)) minmax(0, 1.12fr);
 	}
 	.monitor-content:not(.has-history) .metric-row {
-		grid-template-columns: auto minmax(0, 1fr);
 		padding-block: calc(2px / var(--status-scale, 1));
 		padding-inline: calc(5px / var(--status-scale, 1));
 		column-gap: calc(4px / var(--status-scale, 1));
 	}
-	.monitor-content:not(.has-history) .metric-icon {
-		display: grid;
-		width: calc(22px / var(--status-scale, 1));
-		height: calc(22px / var(--status-scale, 1));
-	}
 	.metric-body {
-		grid-column: 2;
 		gap: 0;
 	}
 	.metric-track,
@@ -1032,6 +1024,10 @@ button.live-state:focus-visible {
 }
 .status-loading-spinner {
 	animation: status-spin 1s linear infinite;
+}
+:global(html[data-ui-motion='reduced']) .status-loading-spinner,
+:global(html[data-ui-motion='reduced']) .status-loading-card::after {
+	animation: none;
 }
 @keyframes status-spin {
 	to {

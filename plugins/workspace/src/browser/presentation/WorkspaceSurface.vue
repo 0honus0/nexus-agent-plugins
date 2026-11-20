@@ -3,7 +3,7 @@
 	import { useResizeObserver } from '@vueuse/core';
 	import { DockviewVue } from 'dockview-vue';
 	import { GripHorizontal } from '@lucide/vue';
-	import { UiDialog } from 'nexus-terminal/browser/ui';
+	import { UiDialog, UiTransition } from 'nexus-terminal/browser/ui';
 	import { createPresentationRegistry, type PresentationContext } from './presentation-registry';
 	import type { WorkspacePane } from '../../shared/workspace-layout-types';
 	import type { WorkspaceTool } from './presentation-types';
@@ -76,6 +76,7 @@
 					:locked="false"
 					:disable-dnd="locked"
 					:disable-floating-groups="true"
+					single-tab-mode="fullwidth"
 					dnd-strategy="pointer"
 					default-renderer="always"
 					@ready="ready"
@@ -83,14 +84,18 @@
 					<template v-for="item in regionDefinitions" :key="item.id" #[`panel-${item.id}`]
 						><div :ref="(node) => bind(item.id, node)" class="workspace-dock-anchor" :data-pane="item.id"
 					/></template>
-					<template #defaultTab="params"
-						><div
-							class="workspace-pane-grip"
-							:aria-label="context.i18n.t('moveRegion', { name: context.i18n.t(params.api.id) })"
-							:title="context.i18n.t('moveRegion', { name: context.i18n.t(params.api.id) })"
-						>
-							<GripHorizontal :size="18" /></div
-					></template>
+					<template #defaultTab="params">
+						<UiTransition preset="drop">
+							<div
+								v-if="!locked"
+								class="workspace-pane-grip"
+								:aria-label="context.i18n.t('moveRegion', { name: context.i18n.t(params.api.id) })"
+								:title="context.i18n.t('moveRegion', { name: context.i18n.t(params.api.id) })"
+							>
+								<GripHorizontal :size="18" />
+							</div>
+						</UiTransition>
+					</template>
 				</DockviewVue>
 			</div>
 			<template v-for="item in tools" :key="item.id">

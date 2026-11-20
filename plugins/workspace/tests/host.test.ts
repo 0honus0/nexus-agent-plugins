@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { expect, it } from 'vitest';
 import { z } from 'zod';
 import { pluginFixture, setEnabled, startHost, until } from '../../test/tests/host.js';
+import { collectBrowserErrors, expectFormFields } from '../../test/tests/browser-checks.js';
 import { startWorkspaceSsh } from './fixtures/workspace-ssh.js';
 import {
 	verifyTerminalSelection,
@@ -36,6 +37,8 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	const content = Buffer.from('example file');
 	await writeFile(join(directory, 'file.txt'), content);
 	await writeFile(join(directory, 'blocked.txt'), content);
+	await mkdir(join(directory, 'prefetch-fixture'));
+	await writeFile(join(directory, 'prefetch-fixture', 'prefetched.txt'), content);
 	const readStarted = Promise.withResolvers<void>();
 	const releaseRead = Promise.withResolvers<void>();
 	const { fingerprint, channels, peers, port } = await startWorkspaceSsh(resources, directory, async (path) => {
@@ -99,11 +102,11 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	expect(
 		await host.json(
 			base + '/catalog/favorites',
-			{ version: 0, value: { name: 'Fixture path', path: '/tmp' } },
+			{ version: 0, value: { name: 'Fixture path', path: '/prefetch-fixture' } },
 			'POST',
 			201,
 		),
-	).toMatchObject({ favorites: [{ name: 'Fixture path', path: '/tmp' }] });
+	).toMatchObject({ favorites: [{ name: 'Fixture path', path: '/prefetch-fixture' }] });
 
 	const png = Buffer.from(
 		'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/1xsAAAAASUVORK5CYII=',
@@ -133,9 +136,29 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 		reducedMotion: 'reduce',
 	});
 	page.setDefaultTimeout(8000);
+	const browserErrors = collectBrowserErrors(page);
+
 	const homeAsset = Promise.withResolvers<void>();
 	const sessionAsset = Promise.withResolvers<void>();
 	const catalog = Promise.withResolvers<void>();
+	const statusSample = Promise.withResolvers<void>();
+	const workspaceCatalog = Promise.withResolvers<void>();
+	const handshakeStarted = Promise.withResolvers<void>();
+	const releaseHandshake = Promise.withResolvers<void>();
+	await page.route('**' + base + '/sessions', async (route) => {
+		if (route.request().method() === 'POST') {
+			handshakeStarted.resolve();
+			await releaseHandshake.promise;
+		}
+		await route.continue();
+	});
+	await page.routeWebSocket('**/status?*', (socket) => {
+		const server = socket.connectToServer();
+		server.onMessage(async (message) => {
+			await statusSample.promise;
+			socket.send(message);
+		});
+	});
 	let catalogAvailable = false;
 	let requestedSession = false;
 	await page.route(/\/WorkspaceApp-[^/]+\.js$/u, async (route) => {
@@ -148,7 +171,13 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 		await route.continue();
 	});
 	await page.route('**/api/plugins/*/catalog', async (route) => {
-		if (!decodeURIComponent(route.request().url()).includes('/@nexus-terminal/connections/')) {
+		const endpoint = decodeURIComponent(new URL(route.request().url()).pathname);
+		if (endpoint.includes('/@nexus-terminal/workspace/')) {
+			await workspaceCatalog.promise;
+			await route.continue();
+			return;
+		}
+		if (!endpoint.includes('/@nexus-terminal/connections/')) {
 			await route.continue();
 			return;
 		}
@@ -175,6 +204,9 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	catalogAvailable = true;
 	await workspace.getByRole('button', { name: 'Retry', exact: true }).click();
 	await browserExpect(workspace.getByText('Workspace test SSH', { exact: true })).toBeVisible();
+	const groupHeading = workspace.locator('.workspace-group-heading');
+	await browserExpect(groupHeading.locator('[data-ui="badge"]')).toHaveText('1');
+	await browserExpect(groupHeading).toHaveAttribute('aria-expanded', 'true');
 
 	const filters = workspace.locator('.workspace-home-filters');
 	const inputBounds = await filters.locator('[data-ui="input"]').boundingBox();
@@ -183,15 +215,52 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 
 	await workspace.getByRole('button', { name: 'Workspace test SSH', exact: true }).click();
 	const confirmation = page.getByRole('dialog', { name: 'Verify server identity' });
+	try {
+		await handshakeStarted.promise;
+		await browserExpect.poll(() => requestedSession).toBe(true);
+		await browserExpect(confirmation).toHaveCount(0);
+	} finally {
+		releaseHandshake.resolve();
+	}
 	await browserExpect(confirmation.getByText(fingerprint, { exact: true })).toBeVisible();
 	await confirmation.getByRole('button', { name: 'Trust and connect' }).click();
 	await browserExpect(workspace.getByText('Opening Workspace…')).toBeVisible();
-	await browserExpect.poll(() => requestedSession).toBe(true);
 	sessionAsset.resolve();
 	await browserExpect(workspace.locator('.xterm')).toBeVisible();
+	await expectFormFields(workspace.locator('.workspace-terminal'));
+	try {
+		const loading = workspace.locator('.status-loading[role="status"]');
+		await browserExpect(loading).toBeVisible();
+		await browserExpect(loading.locator('.status-loading-spinner')).toBeVisible();
+	} finally {
+		statusSample.resolve();
+	}
 	await until(async () => {
 		const { items } = SessionListResponseSchema.parse(await host.json(base + '/sessions'));
 		return items.some((item) => item.state === 'attached') || undefined;
+	});
+
+	const favoriteEditor = page.getByRole('dialog', { name: 'Edit favorite', exact: true });
+	try {
+		await workspace.getByRole('button', { name: 'Favorite paths', exact: true }).click();
+		const addFavorite = page.getByRole('menuitem', { name: 'Save current path', exact: true });
+		await browserExpect(addFavorite).toBeEnabled();
+		await addFavorite.click();
+		await browserExpect(favoriteEditor).toBeVisible();
+		await favoriteEditor
+			.locator('label[for]')
+			.filter({ hasText: /^Remote path$/u })
+			.click();
+		await browserExpect(favoriteEditor.getByRole('textbox', { name: 'Remote path', exact: true })).toBeFocused();
+		await expectFormFields(favoriteEditor);
+		await favoriteEditor.getByRole('button', { name: 'Save', exact: true }).click();
+		await browserExpect(favoriteEditor.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+	} finally {
+		workspaceCatalog.resolve();
+	}
+	await browserExpect(favoriteEditor).toHaveCount(0);
+	expect(await host.json(base + '/catalog')).toMatchObject({
+		favorites: expect.arrayContaining([expect.objectContaining({ name: '/', path: '/' })]),
 	});
 
 	channels[0].write('audit selectable');
@@ -288,6 +357,24 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 		const { items } = SessionListResponseSchema.parse(await host.json(base + '/sessions'));
 		return items.some((item) => item.id === sessionId && item.state === 'disconnected') || undefined;
 	});
+	await page.reload();
+	await tile.getByRole('button', { name: 'Workspace', exact: true }).click();
+	const appearanceReload = page.waitForResponse(
+		(response) => new URL(response.url()).pathname === base + '/appearance',
+	);
+	await workspace.getByRole('button', { name: 'Workspace test SSH', exact: true }).click();
+	await browserExpect(workspace.locator('.xterm')).toBeVisible();
+	expect((await appearanceReload).status()).toBe(200);
+	await browserExpect(workspace.locator('.workspace-file-list')).toHaveCSS(
+		'transform',
+		'matrix(1.1, 0, 0, 1.1, 0, 0)',
+	);
+
+	await setEnabled(host, '@nexus-terminal/connections', false);
+	await browserExpect(workspace).toBeVisible();
+	await browserExpect(workspace.locator('.xterm')).toHaveCount(0);
 	await setEnabled(host, id, false);
 	await until(async () => peers.size === 0 || undefined);
+	await browserExpect(workspace).toHaveCount(0);
+	expect(browserErrors).toEqual([]);
 }, 90000);

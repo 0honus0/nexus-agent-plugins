@@ -81,6 +81,7 @@ export class SshConnection implements SshConnectionApi {
 					localPort: config.localPort,
 					family,
 				});
+				transport.setNoDelay(true);
 				transport.setTimeout(config.timeout ?? 0);
 			}
 

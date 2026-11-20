@@ -163,6 +163,14 @@
 	align-items: center;
 	gap: 4px;
 }
+.connections-tag-delete {
+	flex: none;
+}
+.connections-tag-option-row .connections-tag-option > span:first-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .connections-tag-option {
 	display: flex;
 	align-items: center;

@@ -11,6 +11,7 @@ export function useServerStatus(props: { ctx: PluginContextApi; sessionId: strin
 	const error = shallowRef<ErrorDetail>();
 	let sequence = 0;
 	const available = ref(false);
+	const loading = ref(false);
 	const visibility = useDocumentVisibility();
 	let stream: ReturnType<typeof props.ctx.app.ws.connect> | undefined;
 	let generation = 0;
@@ -21,6 +22,7 @@ export function useServerStatus(props: { ctx: PluginContextApi; sessionId: strin
 		stream?.close();
 		stream = undefined;
 		available.value = false;
+		loading.value = false;
 	}
 
 	watch(
@@ -29,12 +31,22 @@ export function useServerStatus(props: { ctx: PluginContextApi; sessionId: strin
 			stop();
 			if (!active) return;
 			const token = generation;
+			loading.value = true;
+			error.value = undefined;
 			stream = props.ctx.app.ws.connect('/status?sessionId=' + encodeURIComponent(props.sessionId), {
-				autoReconnect: { retries: 5, delay: 1500 },
+				autoReconnect: {
+					retries: 5,
+					delay: 1500,
+
+					onFailed() {
+						if (token === generation) loading.value = false;
+					},
+				},
 
 				onDisconnected() {
 					if (token === generation) {
 						available.value = false;
+						loading.value = !error.value;
 						sequence++;
 					}
 				},
@@ -49,6 +61,7 @@ export function useServerStatus(props: { ctx: PluginContextApi; sessionId: strin
 					}
 					if (!parsed.success) return;
 					const message = parsed.data;
+					loading.value = false;
 					if (message.type === 'error') {
 						sequence++;
 						error.value = message.error;
@@ -65,5 +78,5 @@ export function useServerStatus(props: { ctx: PluginContextApi; sessionId: strin
 		{ immediate: true },
 	);
 	onScopeDispose(stop);
-	return { current, history, available, error };
+	return { current, history, available, loading, error };
 }

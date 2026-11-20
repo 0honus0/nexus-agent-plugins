@@ -26,6 +26,7 @@
 		colorJson = ref('');
 	const copying = ref(false);
 	const errorId = useId();
+	const controlsId = useId();
 	const jsonResult = computed(() => {
 		let value: unknown;
 		try {
@@ -144,7 +145,15 @@
 				><Upload :size="17" /></UiButton
 			><UiButton appearance="ghost" icon-only :aria-label="t('tools.newTheme')" @click="edit()"
 				><Plus :size="17" /></UiButton
-			><input ref="input" type="file" accept=".json,application/json" hidden @change="importTheme" />
+			><input
+				ref="input"
+				:id="controlsId + '-file'"
+				:aria-label="t('tools.importTheme')"
+				type="file"
+				accept=".json,application/json"
+				hidden
+				@change="importTheme"
+			/>
 		</div>
 		<button
 			class="workspace-theme-default"
@@ -217,7 +226,7 @@
 		@update:open="editing = $event"
 	>
 		<div class="workspace-editor-form">
-			<UiField :label="t('tools.name')"><UiInput v-model="name" :aria-label="t('tools.name')" /></UiField>
+			<UiField :label="t('tools.name')" v-slot="field"><UiInput v-model="name" :id="field.id" /></UiField>
 			<UiTabs
 				v-model="editorMode"
 				:label="t('tools.themeEditor')"
@@ -236,18 +245,19 @@
 							><span>{{ t('tools.colors.' + key) }}</span
 							><input
 								type="color"
+								:id="controlsId + '-' + key"
 								:value="(colors[key] ?? '#808080').slice(0, 7)"
 								@input="colors[key] = ($event.target as HTMLInputElement).value"
 						/></label>
 					</div>
 				</template>
 				<template #json>
-					<UiField :label="t('tools.jsonEditor')">
+					<UiField :label="t('tools.jsonEditor')" v-slot="field">
 						<textarea
 							v-model="colorJson"
+							:id="field.id"
 							class="workspace-code-input"
 							rows="14"
-							:aria-label="t('tools.jsonEditor')"
 							spellcheck="false"
 							:aria-invalid="!!jsonResult.error"
 							:aria-describedby="errorId"

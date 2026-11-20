@@ -90,6 +90,7 @@ export async function startHost(
 	resources: AsyncDisposableStack,
 	target = plugin.name,
 	fixtures: readonly Fixture[] = [{ directory: root }, { directory: join(root, 'tests/fixtures/provider') }],
+	options?: { certificateAuthority?: string },
 ) {
 	const fixtureToken = randomUUID();
 	const working = await mkdtemp(join(tmpdir(), 'nexus-external-sdk-'));
@@ -155,6 +156,14 @@ export async function startHost(
 			'sdk-repository.test:host-gateway',
 			'--env',
 			'NEXUS_SDK_FIXTURE_TOKEN',
+			...(options?.certificateAuthority
+				? [
+						'--mount',
+						`type=bind,src=${options.certificateAuthority},target=/tmp/nexus-test-ca.pem,readonly`,
+						'--env',
+						'NODE_EXTRA_CA_CERTS=/tmp/nexus-test-ca.pem',
+					]
+				: []),
 			process.env.NEXUS_TEST_IMAGE ?? defaultImage,
 		],
 		{ env: { ...process.env, NEXUS_SDK_FIXTURE_TOKEN: fixtureToken }, timeout: 90000 },

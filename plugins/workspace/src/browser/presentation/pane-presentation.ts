@@ -19,7 +19,7 @@ export const panePresentationKey: InjectionKey<{
 	changed(): void;
 }> = Symbol('pane-presentation');
 
-/** The old status zoom changes content only. Container queries own responsive geometry;
+/** Pane zoom changes content only. Container queries own responsive geometry;
  * no measured child size, zoom or breakpoint may feed back into Dockview constraints.
  */
 export function usePanePresentation(target: Ref<HTMLElement | undefined>, definition: PanePresentation) {
@@ -43,7 +43,6 @@ export function usePanePresentation(target: Ref<HTMLElement | undefined>, defini
 	});
 	useInputScale({ target, value: scale, ...definition.scale, precision: 2 });
 	const style = computed(() => ({
-		'--status-scale': scale.value,
 		width: `${100 / scale.value}%`,
 		height: `${100 / scale.value}%`,
 		flex: '0 0 auto',

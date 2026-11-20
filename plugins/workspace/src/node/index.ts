@@ -13,6 +13,8 @@ import { registerWorkspaceCatalogHttp } from './workspace-catalog-http.js';
 import { registerWorkspaceLayoutsHttp } from './workspace-layout-http.js';
 import { registerWorkspaceSessionHttp } from './workspace-http.js';
 import { registerWorkspaceFilesHttp } from './workspace-file-http.js';
+import { registerWorkspacePathHistoryHttp } from './workspace-path-history-http.js';
+import { WorkspaceStorage } from './workspace-storage.js';
 
 export { backup, migrations } from './workspace-storage.js';
 
@@ -34,6 +36,7 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 			registerWorkspaceLayoutsHttp(http, new WorkspaceLayoutStorage(database), log, scope);
 			registerWorkspaceSessionHttp(http, service, log, scope);
 			registerWorkspaceFilesHttp(http, service, log, scope);
+			registerWorkspacePathHistoryHttp(http, new WorkspaceStorage(database), log, scope);
 
 			const sessions = state.register({
 				name: WorkspaceSessionsTopic,

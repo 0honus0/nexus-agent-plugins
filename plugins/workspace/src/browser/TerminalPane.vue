@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { onMounted, onScopeDispose, ref, watch, nextTick, computed } from 'vue';
+	import { onMounted, onScopeDispose, ref, watch, nextTick, computed, useId } from 'vue';
 	import { Terminal } from '@xterm/xterm';
 	import { FitAddon } from '@xterm/addon-fit';
 	import type { PluginContextApi } from 'nexus-terminal/browser';
@@ -28,6 +28,7 @@
 		i18n: WorkspaceI18n;
 	}>();
 	const root = ref<HTMLElement>();
+	const inputId = useId();
 	const container = ref<HTMLElement>();
 	const catalog = useWorkspaceCatalog();
 	const background = useWorkspaceBackground();
@@ -102,6 +103,7 @@
 		const unbind = props.input.bindCursorMode(() => terminal?.modes.applicationCursorKeysMode ?? false);
 		unbindInput = unbind;
 		terminal.open(root.value!);
+		if (terminal.textarea) terminal.textarea.id = inputId;
 		applyTheme();
 		echo = createTerminalEchoLayer(terminal, () => catalog.state.value.preferences.localEcho);
 		unbindEcho = props.input.onSent((data, predict) => echo?.input(data, predict && ready));

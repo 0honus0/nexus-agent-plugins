@@ -15,8 +15,17 @@
 	import { useWorkspaceSessions } from './use-workspace-sessions';
 	const props = defineProps<PluginWindowProps & { ctx: PluginContextApi; i18n: WorkspaceI18n }>();
 	const { t } = props.i18n;
+	let sessionModule: Promise<typeof import('./WorkspaceSessionTabs.vue')> | undefined;
+
+	function loadSessionTabs() {
+		return (sessionModule ??= import('./WorkspaceSessionTabs.vue').catch((cause: unknown) => {
+			sessionModule = undefined;
+			throw cause;
+		}));
+	}
+
 	const WorkspaceSessionTabs = defineAsyncComponent({
-		loader: () => import('./WorkspaceSessionTabs.vue'),
+		loader: loadSessionTabs,
 
 		loadingComponent: WorkspaceLoading,
 		delay: 0,
@@ -72,6 +81,14 @@
 		close,
 		suspend,
 	} = useWorkspaceSessions({ ...props, hasTransfers: transfers.hasPending });
+
+	watch(
+		connecting,
+		(pending) => {
+			if (pending) void loadSessionTabs().catch(() => undefined);
+		},
+		{ flush: 'sync' },
+	);
 
 	const sessionsOpened = ref(false);
 	watch(

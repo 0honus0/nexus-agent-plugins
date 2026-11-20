@@ -1,9 +1,11 @@
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref } from 'vue';
 	import { Link } from '@lucide/vue';
-	import manifest from 'virtual:workspace-file-icons';
+	import manifest, { inlineIcons } from 'virtual:workspace-file-icons';
 	const props = defineProps<{ name: string; kind: string }>();
-	const src = computed(() => {
+	const loaded = ref('');
+	const fallback = computed(() => iconFile(props.kind === 'directory' ? manifest.folder : manifest.file));
+	const file = computed(() => {
 		const name = props.name.toLowerCase();
 		const suffixes = name.split('.').map((_, index, parts) => parts.slice(index).join('.'));
 		const id =
@@ -12,15 +14,34 @@
 				: (manifest.fileNames?.[name] ??
 					suffixes.map((ext) => manifest.fileExtensions?.[ext]).find(Boolean) ??
 					manifest.file);
-		const file = manifest.iconDefinitions?.[id!]?.iconPath.split('/').pop() ?? 'file.svg';
-		const location = 'assets/file-icons/' + file;
-		return new URL(location, import.meta.url).href;
+		return iconFile(id);
 	});
+	const embedded = computed(() => inlineIcons[file.value]);
+	const external = computed(() => new URL('assets/file-icons/' + file.value, import.meta.url).href);
+
+	function iconFile(id?: string): string {
+		return (id && manifest.iconDefinitions?.[id]?.iconPath.split('/').pop()) || 'file.svg';
+	}
+
+	function showIcon(event: Event): void {
+		loaded.value = (event.currentTarget as HTMLImageElement).src;
+	}
 </script>
 <template>
-	<span class="workspace-file-icon"
-		><img :src="src" alt="" loading="lazy" /><Link v-if="kind === 'link'" :size="9"
-	/></span>
+	<span class="workspace-file-icon">
+		<img v-if="embedded || loaded !== external" :src="embedded ?? inlineIcons[fallback]" alt="" />
+		<img
+			v-if="!embedded"
+			:src="external"
+			alt=""
+			loading="lazy"
+			decoding="async"
+			class="workspace-file-icon-detail"
+			:class="{ 'is-loaded': loaded === external }"
+			@load="showIcon"
+		/>
+		<Link v-if="kind === 'link'" :size="9" />
+	</span>
 </template>
 <style scoped>
 	.workspace-file-icon {
@@ -33,6 +54,14 @@
 	img {
 		width: 100%;
 		height: 100%;
+	}
+	.workspace-file-icon-detail {
+		position: absolute;
+		inset: 0;
+		visibility: hidden;
+	}
+	.workspace-file-icon-detail.is-loaded {
+		visibility: visible;
 	}
 	svg {
 		position: absolute;

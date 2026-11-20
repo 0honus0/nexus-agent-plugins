@@ -7,6 +7,7 @@ type Output = z.infer<typeof TerminalControlSchema> | { type: 'output'; data: Ui
 /** The connection tab owns its attachment. Switching terminal/files never detaches SSH. */
 export function useSessionTransport(ctx: PluginContextApi, id: string, signal: AbortSignal) {
 	const connected = ref(false),
+		connecting = ref(true),
 		terminalClosed = ref(false);
 	const listeners = new Set<(message: Output) => void>();
 	let stream: ReturnType<typeof ctx.app.ws.connect> | undefined;
@@ -17,7 +18,12 @@ export function useSessionTransport(ctx: PluginContextApi, id: string, signal: A
 		if (signal.aborted || stream) return;
 		stream = ctx.app.ws.connect('/terminal?sessionId=' + encodeURIComponent(id), {
 			signal,
-			autoReconnect: { retries: 5, delay: 1000 },
+			autoReconnect: {
+				retries: 5,
+				delay: 1000,
+
+				onFailed: () => (connecting.value = false),
+			},
 
 			onConnected(socket) {
 				socket.binaryType = 'arraybuffer';
@@ -25,6 +31,7 @@ export function useSessionTransport(ctx: PluginContextApi, id: string, signal: A
 
 			onDisconnected() {
 				connected.value = false;
+				connecting.value = !terminalClosed.value && !signal.aborted;
 			},
 
 			onMessage(_socket, event) {
@@ -39,6 +46,7 @@ export function useSessionTransport(ctx: PluginContextApi, id: string, signal: A
 				}
 				if (message.type === 'snapshot') {
 					connected.value = true;
+					connecting.value = false;
 					terminalClosed.value = message.closed;
 				}
 				if (message.type === 'closed') terminalClosed.value = true;
@@ -53,6 +61,7 @@ export function useSessionTransport(ctx: PluginContextApi, id: string, signal: A
 	});
 	return {
 		connected,
+		connecting,
 		terminalClosed,
 
 		send(message: unknown) {

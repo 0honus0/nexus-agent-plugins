@@ -3,8 +3,8 @@ import { computed, watch, onScopeDispose } from 'vue';
 import {
 	FolderOpen,
 	Keyboard,
-	Terminal,
-	Activity,
+	Zap,
+	Server,
 	Palette,
 	PanelsTopLeft,
 	GripHorizontal,
@@ -80,6 +80,7 @@ export function usePresentation(context: () => PresentationContext) {
 				id: 'layout',
 				label: t('layout'),
 				icon: PanelsTopLeft,
+				menuTransition: 'drop',
 				active: !locked.value,
 				disabled: !loaded.value,
 				items: [
@@ -131,8 +132,8 @@ export function usePresentation(context: () => PresentationContext) {
 			...Object.fromEntries(
 				(
 					[
-						['commands', Terminal],
-						['status', Activity],
+						['commands', Zap],
+						['status', Server],
 					] as const
 				).map(([id, icon]) => [
 					id,

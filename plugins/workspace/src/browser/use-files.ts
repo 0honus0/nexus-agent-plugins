@@ -1,55 +1,127 @@
 import { useWorkspaceTransfers } from './transfers/workspace-transfers';
-import { computed, onScopeDispose, ref, watch } from 'vue';
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue';
 import type { PluginContextApi } from 'nexus-terminal/browser';
-import { isHttpRequestCanceled } from './workspace-client.js';
 import { DirectorySchema, type FileEntry } from '../shared/workspace-file-types';
+import { createDirectoryCache } from './files/directory-cache';
 import { useWorkspaceFilesState } from './files/workspace-files-state';
 import { createWorkspaceClient } from './workspace-client';
 
-export function useFiles(ctx: PluginContextApi, sessionId: string, viewSignal: AbortSignal, enabled: () => boolean) {
+const prefetchDelay = 20;
+
+export function useFiles(
+	ctx: PluginContextApi,
+	sessionId: string,
+	viewSignal: AbortSignal,
+	enabled: () => boolean,
+	connected: () => boolean,
+) {
 	const shared = useWorkspaceFilesState();
 	const lifetime = new AbortController();
 	const signal = AbortSignal.any([viewSignal, ctx.signal, lifetime.signal]);
 	const client = createWorkspaceClient(ctx, signal);
 	const root = 'sessions/' + sessionId;
 	const path = ref('.'),
-		entries = ref<FileEntry[]>([]),
+		entries = shallowRef<FileEntry[]>([]),
 		loaded = ref(false),
 		loading = ref(false),
 		mutating = ref(false);
 	let revision = 0,
 		appliedRevision = -1;
-	const rows = computed(() =>
-		[...entries.value].sort(
-			(a, b) =>
-				Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
-				a.name.localeCompare(b.name, undefined, { numeric: true }),
-		),
-	);
+	let requestedPath = path.value;
+	let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
+	let prefetchTarget: string | undefined;
+	let rejectedPrefetchTarget: string | undefined;
+	let prefetchRevision = 0;
 	const transfers = useWorkspaceTransfers();
 	const busy = computed(() => mutating.value);
 
-	const endpoint = (suffix: string, remote: string) => root + suffix + '?' + new URLSearchParams({ path: remote });
+	const directoryCache = createDirectoryCache(
+		(remote, requestSignal) =>
+			ctx.app.http.json(root + '/directory?' + new URLSearchParams({ path: remote }), DirectorySchema, {
+				signal: requestSignal,
+			}),
+		signal,
+	);
 
-	async function load(remote = path.value) {
+	function cancelPrefetch(): void {
+		prefetchRevision++;
+		clearTimeout(prefetchTimer);
+		prefetchTimer = undefined;
+		prefetchTarget = undefined;
+	}
+
+	function schedulePrefetch(): void {
+		if (prefetchTarget && !prefetchTimer && !signal.aborted) prefetchTimer = setTimeout(runPrefetch, prefetchDelay);
+	}
+
+	function runPrefetch(): void {
+		prefetchTimer = undefined;
+		const target = prefetchTarget;
+		if (!target || !enabled() || loading.value || !directoryCache.idle()) return;
+		prefetchTarget = undefined;
+		if (directoryCache.get(target)) return;
+		const current = prefetchRevision;
+		void directoryCache
+			.read(target)
+			.catch(() => {
+				if (!signal.aborted && current === prefetchRevision) rejectedPrefetchTarget = target;
+			})
+			.finally(schedulePrefetch);
+	}
+
+	function prefetch(remote: string): void {
+		if (
+			signal.aborted ||
+			!enabled() ||
+			loading.value ||
+			remote === path.value ||
+			remote === rejectedPrefetchTarget ||
+			directoryCache.get(remote)
+		)
+			return;
+		clearTimeout(prefetchTimer);
+		prefetchTimer = undefined;
+		prefetchTarget = remote;
+		schedulePrefetch();
+	}
+
+	function invalidate(): void {
+		cancelPrefetch();
+		rejectedPrefetchTarget = undefined;
+		directoryCache.invalidate();
+		revision++;
+		appliedRevision = -1;
+		loading.value = false;
+	}
+
+	async function navigate(remote: string) {
+		cancelPrefetch();
 		const current = ++revision;
-		const requestedRevision = shared.revision.value;
-		loading.value = true;
+		requestedPath = remote;
+		const cached = directoryCache.get(remote);
+		loading.value = !cached;
 		try {
-			const value = await client.request(endpoint('/directory', remote), undefined, undefined, DirectorySchema);
+			const value = cached ?? (await directoryCache.read(remote));
 			if (current !== revision || signal.aborted) return;
+			requestedPath = value.path;
 			path.value = value.path;
 			entries.value = value.entries;
 			loaded.value = true;
-			appliedRevision = requestedRevision;
+			appliedRevision = shared.revision.value;
+			return value.path;
 		} catch (cause) {
+			if (current !== revision || signal.aborted) return;
+			requestedPath = path.value;
 			client.report(cause);
 		} finally {
-			if (current === revision) {
-				loading.value = false;
-				if (requestedRevision !== shared.revision.value && enabled() && !signal.aborted) void load();
-			}
+			if (current === revision) loading.value = false;
 		}
+	}
+
+	async function load(remote?: string) {
+		if (!enabled() || signal.aborted) return;
+		if (remote === undefined) invalidate();
+		return navigate(remote ?? requestedPath);
 	}
 
 	function upload(files: FileList | File[]) {
@@ -67,23 +139,29 @@ export function useFiles(ctx: PluginContextApi, sessionId: string, viewSignal: A
 	}
 
 	watch(
-		[enabled, shared.revision],
-		([value]) => {
-			if (value && (!loaded.value || appliedRevision !== shared.revision.value) && !loading.value) void load();
+		[enabled, connected, shared.revision],
+		([active, online, current], [, wasOnline, previous]) => {
+			if ((wasOnline && !online) || (previous !== undefined && current !== previous)) invalidate();
+			if (!active) cancelPrefetch();
+			if (active && online && !signal.aborted && appliedRevision !== current && !loading.value)
+				void navigate(requestedPath);
 		},
-		{ immediate: true },
+		{ immediate: true, flush: 'sync' },
 	);
 	onScopeDispose(() => {
 		lifetime.abort();
+		invalidate();
 	});
 	return {
 		path,
-		rows,
+		entries,
 		loaded,
 		loading,
 		mutating,
 		busy,
 		load,
+		prefetch,
+		cancelPrefetch,
 		upload,
 		download,
 	};

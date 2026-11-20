@@ -180,9 +180,11 @@
 			<UiField v-if="connectionDefaults[draft.type].domain" :label="t('domain')" v-slot="field"
 				><UiInput v-model="draft.domain" :id="field.id" maxlength="120" :disabled="saving"
 			/></UiField>
-			<UiField :label="t('tags')" :hint="t('tagHint')"
+			<UiField :label="t('tags')" :hint="t('tagHint')" v-slot="field"
 				><TagPicker
 					v-model="draft.tags"
+					:input-id="field.id"
+					:input-described-by="field.describedby"
 					:tags="catalog.tags"
 					:signal="signal"
 					:view="view"

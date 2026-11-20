@@ -2,7 +2,7 @@
 	import { computed, ref } from 'vue';
 	import { Server, Monitor, ScreenShare, Search, ChevronDown, Tags, Play, X, LoaderCircle } from '@lucide/vue';
 	import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from 'reka-ui';
-	import { UiButton, UiCard, UiInput, UiSelect } from 'nexus-terminal/browser/ui';
+	import { UiBadge, UiButton, UiCard, UiInput, UiSelect } from 'nexus-terminal/browser/ui';
 	import { type Connection } from '@nexus-terminal/connections/connections-client-api';
 	import type { SessionInfo } from '../shared/workspace-types';
 	import type { WorkspaceI18n } from './workspace-i18n';
@@ -23,7 +23,7 @@
 		manage: [];
 		retry: [];
 	}>();
-	const { t } = props.i18n;
+	const { t, n } = props.i18n;
 	const search = ref(''),
 		type = ref('all');
 	const icons = { ssh: Server, rdp: Monitor, vnc: ScreenShare };
@@ -116,11 +116,12 @@
 				<p v-else role="status">{{ t('loadingConnections') }}</p>
 			</div>
 			<CollapsibleRoot v-for="group in groups" :key="group.tag" :default-open="true" class="workspace-group">
-				<CollapsibleTrigger class="workspace-group-heading"
-					><Tags :size="16" /><span>{{ group.tag || t('ungrouped') }}</span
-					><small>{{ group.items.length }}</small
-					><ChevronDown :size="16" class="workspace-group-chevron"
-				/></CollapsibleTrigger>
+				<CollapsibleTrigger class="workspace-group-heading">
+					<Tags :size="16" aria-hidden="true" />
+					<span class="workspace-group-label">{{ group.tag || t('ungrouped') }}</span>
+					<UiBadge class="workspace-group-count">{{ n(group.items.length) }}</UiBadge>
+					<ChevronDown :size="16" class="workspace-group-chevron" aria-hidden="true" />
+				</CollapsibleTrigger>
 				<CollapsibleContent
 					><div class="workspace-home-grid workspace-connections">
 						<UiCard

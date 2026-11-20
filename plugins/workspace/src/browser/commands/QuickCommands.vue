@@ -384,21 +384,15 @@
 		@update:open="editing = $event"
 	>
 		<div class="workspace-editor-form">
-			<UiField :label="t('tools.name')"><UiInput v-model="name" :aria-label="t('tools.name')" /></UiField
-			><UiField :label="t('tools.command')">
-				<textarea
-					v-model="command"
-					class="workspace-code-input"
-					:aria-label="t('tools.command')"
-					spellcheck="false"
-					rows="5"
-				/>
+			<UiField :label="t('tools.name')" v-slot="field"><UiInput v-model="name" :id="field.id" /></UiField
+			><UiField :label="t('tools.command')" v-slot="field">
+				<textarea v-model="command" :id="field.id" class="workspace-code-input" spellcheck="false" rows="5" />
 			</UiField>
 			<p class="workspace-form-hint">{{ t('tools.variablesHint', { example: '${name}' }) }}</p>
-			<UiField :label="t('tools.tags')"
-				><UiInput v-model="tags" :aria-label="t('tools.tags')" :placeholder="t('tools.tagsHint')" /></UiField
-			><UiField v-for="key in commandVariables(command)" :key="key" :label="key"
-				><UiInput v-model="variables[key]" :aria-label="key"
+			<UiField :label="t('tools.tags')" v-slot="field"
+				><UiInput v-model="tags" :id="field.id" :placeholder="t('tools.tagsHint')" /></UiField
+			><UiField v-for="key in commandVariables(command)" :key="key" :label="key" v-slot="field"
+				><UiInput v-model="variables[key]" :id="field.id"
 			/></UiField>
 		</div>
 		<template #footer
@@ -422,8 +416,8 @@
 			<div class="workspace-command-tags">
 				<span v-for="target in recipients" :key="target.id">{{ target.name }}</span>
 			</div>
-			<UiField v-for="key in commandVariables(executing?.command ?? '')" :key="key" :label="key"
-				><UiInput v-model="values[key]" :aria-label="key"
+			<UiField v-for="key in commandVariables(executing?.command ?? '')" :key="key" :label="key" v-slot="field"
+				><UiInput v-model="values[key]" :id="field.id"
 			/></UiField>
 			<pre class="workspace-command-preview">{{ expanded }}</pre>
 		</div>

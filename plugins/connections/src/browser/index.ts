@@ -6,7 +6,7 @@ import { messages } from './messages.js';
 import ConnectionsTile from './ConnectionsTile.vue';
 import './connections.css';
 
-export const activate: PluginModuleApi['activate'] = (context) => {
+export const activate: PluginModuleApi['activate'] = async (context) => {
 	context.app.log.registerMessages({ en: messages.en.notices, zh: messages.zh.notices });
 	const client = new ConnectionsClient(context);
 	const label = ref('Connections');
@@ -17,8 +17,18 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 	document.head.append(stylesheet);
 	context.onDispose(() => stylesheet.remove());
 
+	let appModule: Promise<typeof import('./ConnectionsApp.vue')> | undefined;
+
+	function preload() {
+		context.signal.throwIfAborted();
+		return (appModule ??= import('./ConnectionsApp.vue').catch((cause: unknown) => {
+			appModule = undefined;
+			throw cause;
+		}));
+	}
+
 	const component = defineAsyncComponent(async () => {
-		const { default: App } = await import('./ConnectionsApp.vue');
+		const { default: App } = await preload();
 		context.signal.throwIfAborted();
 
 		return defineComponent({
@@ -41,16 +51,21 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 	});
 
 	context.provide('connections', client);
-	context.contribute({
-		applications: [
-			{
-				id: 'main',
-				label,
-				component,
-				tile: { component: tile, showAtIconSize: true },
-				scrollbarGutter: 'stable',
-			},
-		],
-	});
+	const application = {
+		id: 'main',
+		label,
+		component,
+		tile: { component: tile, showAtIconSize: true },
+		scrollbarGutter: 'stable',
+	} as const;
+	try {
+		context.contribute({ applications: [{ ...application, preload }] });
+	} catch (cause) {
+		if (!(cause instanceof Error) || !('code' in cause) || cause.code !== 'PLUGIN_CONTRIBUTIONS_INVALID')
+			throw cause;
+		context.contribute({ applications: [application] });
+	}
+	await client.refresh().catch((cause) => client.report(cause, undefined, false));
+	context.signal.throwIfAborted();
 	context.self.readiness.set({ state: 'ready' });
 };

@@ -2,8 +2,8 @@ import type { CredentialsClientApi } from '@nexus-terminal/credentials/credentia
 import { PluginHttpError, type PluginContextApi, type PluginViewApi } from 'nexus-terminal/browser';
 import { readonly, ref, shallowReadonly, shallowRef, type Ref } from 'vue';
 import { z } from 'zod';
+import { ConnectionCatalogResponseSchema } from '../shared/connection-http-types.js';
 import {
-	ConnectionCatalogSchema,
 	ConnectionEditorRequestSchema,
 	ConnectionSchema,
 	ConnectionsRevisionSchema,
@@ -47,8 +47,10 @@ export class ConnectionsClient implements ConnectionsClientApi {
 	readonly credentials = shallowReadonly(this.#credentials);
 	readonly editorRequest = shallowReadonly(this.#editor);
 	#subscribed = false;
-	#requested = 0;
-	#applied = 0;
+	#reading: Promise<void> | undefined;
+	#revision: number | undefined;
+	#snapshotRevision: number | undefined;
+	#generation = 0;
 	#navigation = 0;
 
 	readonly #context: PluginContextApi;
@@ -95,22 +97,62 @@ export class ConnectionsClient implements ConnectionsClientApi {
 		this.#context.signal.throwIfAborted();
 		signal?.throwIfAborted();
 
+		const reading = (this.#reading ??= Promise.resolve()
+			.then(() => this.#read())
+			.finally(() => {
+				this.#reading = undefined;
+			}));
+		if (!signal) return reading;
+
+		// 关闭一个窗口只取消它的等待，桌面和其他窗口仍可使用共享读取。
+		return new Promise((resolve, reject) => {
+			const abort = () => reject(signal.reason);
+
+			signal.addEventListener('abort', abort, { once: true });
+			void reading.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+		});
+	}
+
+	async #read(): Promise<void> {
+		const signal = AbortSignal.any([this.#context.signal, AbortSignal.timeout(5_000)]);
+		signal.throwIfAborted();
 		if (!this.#subscribed) {
 			this.#subscribed = true;
 			this.#context.app.state.subscribe('connections', ConnectionsRevisionSchema, {
-				updated: () => void this.refresh().catch((cause) => this.report(cause, undefined, false)),
+				updated: ({ revision }) => {
+					this.#revision = revision;
+					if (!this.#reading && revision !== this.#snapshotRevision)
+						void this.refresh().catch((cause) => this.report(cause, undefined, false));
+				},
+
+				unconfirmed: () => {
+					if (this.#revision !== undefined) this.#generation++;
+					this.#revision = undefined;
+					this.#snapshotRevision = undefined;
+				},
 			});
 		}
-		const request = ++this.#requested;
 		this.#requests.value++;
 		try {
-			const data = await this.#context.app.http.json('/catalog', ConnectionCatalogSchema, { signal });
-			this.#context.signal.throwIfAborted();
-			signal?.throwIfAborted();
-			if (request < this.#applied) return;
-			this.#applied = request;
-			this.#catalog.value = data;
-			this.#loaded.value = true;
+			for (;;) {
+				const observed = this.#revision;
+				const generation = this.#generation;
+				const { revision, ...catalog } = await this.#context.app.http.json(
+					'/catalog',
+					ConnectionCatalogResponseSchema,
+					{ signal },
+				);
+				signal.throwIfAborted();
+				if (
+					generation !== this.#generation ||
+					(this.#revision !== observed && this.#revision !== undefined && this.#revision !== revision)
+				)
+					continue;
+				this.#snapshotRevision = revision ?? observed;
+				this.#catalog.value = catalog;
+				this.#loaded.value = true;
+				return;
+			}
 		} finally {
 			this.#requests.value--;
 		}
@@ -141,6 +183,7 @@ export class ConnectionsClient implements ConnectionsClientApi {
 					},
 				);
 				signal.throwIfAborted();
+				this.#generation++;
 				this.#context.app.log.report({ level: 'info', code: 'CONNECTION_SAVED', userVisible: true });
 				return result;
 			},
@@ -161,6 +204,7 @@ export class ConnectionsClient implements ConnectionsClientApi {
 			async (signal) => {
 				await this.#context.app.http.json(path, z.undefined(), { method: 'DELETE', signal });
 				signal.throwIfAborted();
+				this.#generation++;
 				this.#context.app.log.report({ level: 'info', code, userVisible: true });
 			},
 			{ view },

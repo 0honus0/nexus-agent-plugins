@@ -17,7 +17,7 @@ export function useFileOperations(
 	files: {
 		path: { value: string };
 		mutating: { value: boolean };
-		load(path?: string): Promise<void>;
+		load(path?: string): Promise<unknown>;
 	},
 	confirmDeletion: () => boolean = () => true,
 ) {

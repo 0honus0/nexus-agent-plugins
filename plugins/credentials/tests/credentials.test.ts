@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { test } from 'node:test';
 import { chromium, expect } from '@playwright/test';
+import { collectBrowserErrors, expectFormFields } from '../../test/tests/browser-checks.js';
 import { pluginFixture, startHost } from '../../test/tests/host.js';
 import { CredentialSchema, CredentialsSnapshotSchema } from '../src/shared/credentials-types.js';
 
@@ -85,7 +86,8 @@ test(
 
 		const browser = await chromium.launch();
 		resources.defer(() => browser.close());
-		const page = await browser.newPage({ locale: 'en-US' });
+		const page = await browser.newPage({ locale: 'en-US', reducedMotion: 'reduce' });
+		const browserErrors = collectBrowserErrors(page);
 		await page.goto(host.origin);
 		await page.getByRole('textbox', { name: 'Username' }).fill('owner');
 		await page.locator('input[type=password]').fill('sdk-fixture-password');
@@ -97,6 +99,14 @@ test(
 
 		await app.getByRole('button', { name: 'Add credential', exact: true }).click();
 		const dialog = page.getByRole('dialog', { name: 'Add credential' });
+		await expectFormFields(dialog);
+		const nameInput = dialog.getByRole('textbox', { name: 'Name', exact: true });
+		const usernameInput = dialog.getByRole('textbox', { name: 'Username', exact: true });
+		const nameBounds = (await nameInput.boundingBox())!;
+		const usernameBounds = (await usernameInput.boundingBox())!;
+		assert.equal(nameBounds.x, usernameBounds.x);
+		assert.equal(nameBounds.width, usernameBounds.width);
+		assert.ok(usernameBounds.y >= nameBounds.y + nameBounds.height);
 		await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Browser credential');
 		await dialog.getByRole('textbox', { name: 'Username', exact: true }).fill('browser-user');
 		await dialog.locator('input[type=password]').fill('browser-fixture-password');
@@ -109,6 +119,10 @@ test(
 		await dialog.getByRole('textbox', { name: 'Username', exact: true }).fill('browser-user');
 		await dialog.getByRole('combobox', { name: 'Authentication' }).click();
 		await page.getByRole('option', { name: 'Private key', exact: true }).click();
+		const upload = dialog.getByRole('button', { name: 'Choose private key file' });
+		const keyInput = dialog.getByRole('textbox', { name: 'Private key', exact: true });
+		await expectFormFields(dialog);
+		assert.equal((await upload.boundingBox())!.width, (await keyInput.boundingBox())!.width);
 		await dialog.getByRole('textbox', { name: 'Private key', exact: true }).fill('invalid key');
 		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.locator('[data-ui="toast"]').getByText('Invalid private key or passphrase.')).toBeVisible();
@@ -117,5 +131,6 @@ test(
 		const response = await host.request(path + '/' + key.id, { method: 'DELETE' });
 		assert.equal(response.status, 204);
 		await expect(app.getByText('SSH key fixture')).toHaveCount(0);
+		expect(browserErrors).toEqual([]);
 	},
 );

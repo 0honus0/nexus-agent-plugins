@@ -200,7 +200,7 @@ export function registerWorkspaceFilesHttp(
 			handler: (input: z.output<typeof getSessionsIdDirectoryInput>, signal: AbortSignal) =>
 				workspaceHttp(log, signal, async () => {
 					const files = service.files(input.id);
-					return files.list(input.path);
+					return files.list(input.path, signal);
 				}),
 		},
 		{

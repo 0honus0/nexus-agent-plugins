@@ -62,16 +62,19 @@ it('backs up layouts and portable preferences while keeping host trust local', (
 		'background_presets',
 		'background_images',
 		'layouts',
+		'path_history',
 	]);
 	expect(backup.find(({ table }) => table === 'layouts')?.keys).toEqual(['profile']);
 });
 
 it('round-trips bounded panel scales and supports layouts without a custom scale', () => {
 	expect(WorkspaceLayoutSchema.parse(layout()).scales).toBeUndefined();
-	expect(WorkspaceLayoutSchema.parse({ ...layout(), scales: { status: 0.65 } }).scales).toEqual({
+	expect(WorkspaceLayoutSchema.parse({ ...layout(), scales: { status: 0.65, files: 1.6 } }).scales).toEqual({
 		status: 0.65,
+		files: 1.6,
 	});
-	for (const status of [0.1, 1.61, Infinity, NaN]) {
-		expect(WorkspaceLayoutSchema.safeParse({ ...layout(), scales: { status } }).success).toBe(false);
+	for (const scale of [0.1, 1.61, Infinity, NaN]) {
+		expect(WorkspaceLayoutSchema.safeParse({ ...layout(), scales: { status: scale } }).success).toBe(false);
+		expect(WorkspaceLayoutSchema.safeParse({ ...layout(), scales: { files: scale } }).success).toBe(false);
 	}
 });

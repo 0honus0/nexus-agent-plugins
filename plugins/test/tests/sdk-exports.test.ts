@@ -46,6 +46,7 @@ test('发布包的三个入口维持明确的运行时导出', async () => {
 			'UiInput',
 			'UiList',
 			'UiListItem',
+			'UiLoadingTiles',
 			'UiProgress',
 			'UiProgressRow',
 			'UiResizeHandle',
