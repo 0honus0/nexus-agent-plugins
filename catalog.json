@@ -483,6 +483,54 @@
             "integrity": "sha512-vpYrKg+abnPj9wcEPnugeJlkLsE5jSUwViT5Ldv/G1Ln8UAa/8zSBS7Yy40NStc8wJdqlSdA8NJDzbPZ+euerA=="
           }
         ]
+      },
+      {
+        "package": {
+          "name": "@nexus-terminal/workspace",
+          "version": "0.0.1-dev.2",
+          "type": "module",
+          "description": "SSH terminals, files, server status and quick commands",
+          "files": [
+            "dist"
+          ],
+          "exports": {},
+          "peerDependencies": {
+            "nexus-terminal": "^1.1.0"
+          },
+          "nexus": {
+            "kind": "application",
+            "entry": {
+              "backend": "dist/node/index.js",
+              "frontend": "dist/browser/index.js"
+            },
+            "dependsOn": {
+              "@nexus-terminal/credentials": "^0.0.1-dev.2",
+              "@nexus-terminal/connections": "^0.0.1-dev.2",
+              "@nexus-terminal/ssh": "^0.0.1-dev.1",
+              "@nexus-terminal/remote-tools": "^0.0.1-dev.1"
+            },
+            "i18n": {
+              "zh-CN": {
+                "description": "SSH 终端、文件管理、服务器状态和快捷指令"
+              }
+            }
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "scripts": {
+            "build": "node ../../scripts/build-plugin.mjs",
+            "typecheck": "vue-tsc --noEmit",
+            "test:setup": "playwright install --with-deps chromium",
+            "test": "pnpm build && vitest run"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/workspace/v0.0.1-dev.2/workspace-0.0.1-dev.2.tgz",
+            "integrity": "sha512-ZlR/2Qv8ovEDG93kvDjxaTPTd6KKU1HBi90YdQr4g8tdwX3Dbr1HTe+Yd1jlf23T0Tky4eXvNOb4ynctEyOzZw=="
+          }
+        ]
       }
     ]
   },
