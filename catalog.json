@@ -89,6 +89,51 @@
             "integrity": "sha512-OYMZDwSpxvse1J6Uzk11Mz+k3nXN0MS5cvV9kJt5PbOodjT92NJSzi3Ct6zabfos4w6Sisl2FHFekCsa2zReVQ=="
           }
         ]
+      },
+      {
+        "package": {
+          "name": "@nexus-terminal/ssh",
+          "version": "0.0.1-dev.3",
+          "type": "module",
+          "description": "SSH connections, terminals, commands, SFTP and port forwarding",
+          "files": [
+            "dist"
+          ],
+          "exports": {
+            "./ssh-api": {
+              "types": "./dist/node/ssh-api.d.ts"
+            }
+          },
+          "peerDependencies": {
+            "nexus-terminal": "^1.0.0"
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "nexus": {
+            "kind": "extension",
+            "icon": "terminal",
+            "entry": {
+              "backend": "dist/node/index.js"
+            },
+            "i18n": {
+              "zh-CN": {
+                "description": "提供 SSH 连接、终端、命令执行、SFTP 和端口转发"
+              }
+            }
+          },
+          "scripts": {
+            "build": "node scripts/build.mjs",
+            "typecheck": "tsc -p tsconfig.json",
+            "test": "pnpm build && tsx --test tests/*.test.ts"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/ssh/v0.0.1-dev.3/ssh-0.0.1-dev.3.tgz",
+            "integrity": "sha512-Cv0tUL1L6In0WBVDkoS4b5lk92mYN9PLw6QCJBuVf3v3rPx25GeODmlHWLWsRKJ8tN2p7m1ytdu3ImeywYSK2A=="
+          }
+        ]
       }
     ]
   },
