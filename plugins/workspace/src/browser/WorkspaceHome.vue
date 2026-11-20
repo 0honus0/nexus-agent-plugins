@@ -1,17 +1,6 @@
 <script setup lang="ts">
 	import { computed, ref } from 'vue';
-	import {
-		Server,
-		Monitor,
-		ScreenShare,
-		Search,
-		ChevronDown,
-		Tags,
-		Play,
-		X,
-		LoaderCircle,
-		ArrowUpRight,
-	} from '@lucide/vue';
+	import { Server, Monitor, ScreenShare, Search, ChevronDown, Tags, Play, X, LoaderCircle } from '@lucide/vue';
 	import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from 'reka-ui';
 	import { UiButton, UiCard, UiInput, UiSelect } from 'nexus-terminal/browser/ui';
 	import { type Connection } from '@nexus-terminal/connections/connections-client-api';
@@ -78,9 +67,7 @@
 				<h2>{{ t('subtitle') }}</h2>
 				<p>{{ t('description') }}</p>
 			</div>
-			<UiButton :disabled="!connectionsAvailable" @click="emit('manage')"
-				><ArrowUpRight :size="16" />{{ t('manage') }}</UiButton
-			>
+			<UiButton :disabled="!connectionsAvailable" @click="emit('manage')">{{ t('manage') }}</UiButton>
 		</header>
 		<div class="workspace-home-filters">
 			<div class="workspace-home-search">
