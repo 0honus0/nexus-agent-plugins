@@ -13,6 +13,7 @@ import type { ConnectionsApi } from '@nexus-terminal/connections/connections-api
 import type { CredentialsApi } from '@nexus-terminal/credentials/credentials-api';
 import type { PluginDatabaseApi } from 'nexus-terminal/node';
 import { TerminalInputSchema, type SessionCreate, type SessionInfo } from '../shared/workspace-types';
+import type { WorkspaceSessionPresentation } from '../shared/workspace-layout-types';
 import { WorkspaceStorage } from './workspace-storage.js';
 import { WorkspaceSessionScope } from './workspace-session-scope.js';
 import { WorkspaceError, describeWorkspaceError } from './workspace-error';
@@ -477,7 +478,7 @@ export class WorkspaceService {
 		socket.once('close', () => clearInterval(heartbeat));
 	}
 
-	async suspend(id: string) {
+	async suspend(id: string, presentation?: WorkspaceSessionPresentation) {
 		const s = this.#get(id);
 		if (s.attaching || s.suspending) throw new WorkspaceError('WORKSPACE_SESSION_BUSY', 409);
 		s.suspending = true;
@@ -488,6 +489,7 @@ export class WorkspaceService {
 			await this.transfers.cancelSession(id);
 			await s.files.cancelTransfers();
 			if (s.closed) throw new WorkspaceError('WORKSPACE_SESSION_NOT_FOUND', 404);
+			if (presentation) s.info.presentation = presentation;
 			s.socket?.close(1000);
 			s.socket = undefined;
 			s.output.check();

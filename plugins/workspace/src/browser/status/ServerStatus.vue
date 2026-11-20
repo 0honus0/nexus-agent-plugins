@@ -272,71 +272,69 @@
 		:data-status-scale="localScale.toFixed(2)"
 		class="status-monitor workspace-status-viewport"
 	>
-		<div v-if="awaitingSample" class="status-loading" role="status" :aria-busy="awaitingSample">
-			<div class="status-loading-panel" :style="scaleStyle">
-				<header class="status-loading-head">
-					<LoaderCircle class="status-loading-spinner" :size="14" aria-hidden="true" />
-					<span>{{ t('monitor.loading') }}</span>
-				</header>
-				<div class="status-loading-list" aria-hidden="true">
-					<div v-for="index in 4" :key="index" class="status-loading-card">
-						<span class="status-loading-icon"></span>
-						<span class="status-loading-copy">
-							<span class="status-loading-line status-loading-line--title"></span>
-							<span class="status-loading-line status-loading-line--detail"></span>
-						</span>
-						<span class="status-loading-reading"></span>
-						<span class="status-loading-track"></span>
-					</div>
-					<div class="status-loading-card status-loading-card--network">
-						<span class="status-loading-icon"></span>
-						<span class="status-loading-copy">
-							<span class="status-loading-line status-loading-line--title"></span>
-						</span>
-						<span class="status-loading-interface"></span>
-						<span class="status-loading-traffic">
-							<i></i>
-							<i></i>
-						</span>
-					</div>
-				</div>
-			</div>
-		</div>
 		<div
-			v-else
 			:style="scaleStyle"
 			:data-status-scale="localScale.toFixed(2)"
 			class="status-surface workspace-status-panel"
 			:class="{ 'has-history': Boolean(selectedMetric), 'status-has-data': hasVisibleData }"
 		>
-			<div v-if="monitor.error.value" class="empty-state">
-				<div class="status-error-notice" role="status">
-					{{ t('monitor.failed', { code: String(monitor.error.value.code) }) }}
-				</div>
-			</div>
-			<section v-else-if="monitor.current.value" class="monitor-panel">
+			<section class="monitor-panel">
 				<header class="monitor-header">
 					<strong>{{ t('monitor.title') }}</strong>
-					<span v-if="loading" class="live-state" role="status" :aria-label="t('monitor.loading')">
-						<LoaderCircle class="status-loading-spinner" :size="12" aria-hidden="true" />
-					</span>
 					<button
-						v-else-if="host"
+						v-if="host"
 						type="button"
 						class="live-state host-button status-touch-target"
 						:title="t('monitor.copyHost')"
 						:aria-label="t('monitor.copyHost') + ': ' + host"
 						@click="copyHost"
 					>
-						<i v-if="monitor.available.value" class="status-dot"></i>
+						<i class="status-dot" :class="{ 'is-live': monitor.available.value }" aria-hidden="true"></i>
 						<span class="host-name">{{ host }}</span>
 					</button>
 					<span v-else-if="monitor.available.value" class="live-state"
-						><i class="status-dot"></i><span class="live-label">{{ t('monitor.live') }}</span></span
+						><i class="status-dot is-live" aria-hidden="true"></i
+						><span class="live-label">{{ t('monitor.live') }}</span></span
 					>
 				</header>
-
-				<div class="monitor-content" :class="{ 'has-history': Boolean(selectedMetric) }">
+				<div v-if="awaitingSample" class="status-loading" role="status" aria-busy="true">
+					<div class="status-loading-head">
+						<LoaderCircle class="status-loading-spinner" :size="14" aria-hidden="true" />
+						<span>{{ t('monitor.loading') }}</span>
+					</div>
+					<div class="status-loading-list" aria-hidden="true">
+						<div v-for="index in 4" :key="index" class="status-loading-card">
+							<span class="status-loading-icon"></span>
+							<span class="status-loading-copy">
+								<span class="status-loading-line status-loading-line--title"></span>
+								<span class="status-loading-line status-loading-line--detail"></span>
+							</span>
+							<span class="status-loading-reading"></span>
+							<span class="status-loading-track"></span>
+						</div>
+						<div class="status-loading-card status-loading-card--network">
+							<span class="status-loading-icon"></span>
+							<span class="status-loading-copy">
+								<span class="status-loading-line status-loading-line--title"></span>
+							</span>
+							<span class="status-loading-interface"></span>
+							<span class="status-loading-traffic">
+								<i></i>
+								<i></i>
+							</span>
+						</div>
+					</div>
+				</div>
+				<div v-else-if="monitor.error.value" class="empty-state">
+					<div class="status-error-notice" role="status">
+						{{ t('monitor.failed', { code: String(monitor.error.value.code) }) }}
+					</div>
+				</div>
+				<div
+					v-else-if="monitor.current.value"
+					class="monitor-content"
+					:class="{ 'has-history': Boolean(selectedMetric) }"
+				>
 					<div class="metric-list">
 						<button
 							v-for="metric in metrics"

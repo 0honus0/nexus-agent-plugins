@@ -8,20 +8,30 @@ import type { PluginContextApi } from 'nexus-terminal/browser';
 import type { PluginWindowApi } from 'nexus-terminal/browser';
 import { resolveLayoutProfile } from '../layout-profile.js';
 import type { LayoutProfile } from '../../shared/layout-types.js';
-import { WorkspaceLayoutSchema, type WorkspacePane, type WorkspaceTool } from '../../shared/workspace-layout-types';
+import {
+	WorkspaceLayoutSchema,
+	type WorkspaceLayout,
+	type WorkspacePane,
+	type WorkspaceSessionPresentation,
+	type WorkspaceTool,
+} from '../../shared/workspace-layout-types';
+import type { SessionInfo } from '../../shared/workspace-types';
 import type { WorkspaceI18n } from '../workspace-i18n';
 import { createWorkspaceClient } from '../workspace-client';
 import { workspaceLayoutStateKey } from './workspace-layout-state';
+import { dockSizes, dockStructure, withDockSizes } from './dock-layout';
 
 export function useWorkspaceLayout(props: {
 	ctx: PluginContextApi;
 	view: PluginWindowApi;
 	i18n: WorkspaceI18n;
 	active: boolean;
+	session: SessionInfo;
 }) {
 	const api = shallowRef<DockviewApi>();
 	const minimumSize = reactive({ width: 0, height: 0 });
 	const scales = reactive<Partial<Record<WorkspacePane, number>>>({});
+	const presentation: WorkspaceSessionPresentation = { ...props.session.presentation };
 	const viewport = { width: 0, height: 0 };
 
 	provide(panePresentationKey, {
@@ -75,6 +85,8 @@ export function useWorkspaceLayout(props: {
 		applyingConstraints = false,
 		disposed = false;
 	let currentProfile: LayoutProfile | undefined;
+	let currentStructure: string | undefined;
+	let appliedLayout: WorkspaceLayout | undefined;
 	const subscriptions: ReturnType<DockviewApi['onDidLayoutChange']>[] = [];
 	const panelSubscriptions = new Map<string, ReturnType<DockviewApi['onDidLayoutChange']>>();
 
@@ -88,6 +100,15 @@ export function useWorkspaceLayout(props: {
 		for (const id of Object.keys(paneSizes) as WorkspacePane[]) panelVisibility[id] = visibleIds.has(id);
 	};
 
+	function rememberedTools(profile: LayoutProfile): WorkspaceLayout['tools'] {
+		const currentConfig: PresentationProfile = presentationProfiles[profile];
+		return Object.fromEntries(
+			Object.entries(currentConfig.tools)
+				.filter(([, options]) => options.remember)
+				.map(([id]) => [id, !!toolOpen[id as WorkspaceTool]]),
+		);
+	}
+
 	function capture() {
 		if (
 			!api.value ||
@@ -100,23 +121,35 @@ export function useWorkspaceLayout(props: {
 		)
 			return;
 		try {
-			const currentConfig: PresentationProfile = presentationProfiles[currentProfile];
+			const dock = api.value.toJSON();
+			presentation[currentProfile] = {
+				sizes: { ...presentation[currentProfile]?.sizes, ...dockSizes(dock) },
+				scales: { ...scales },
+			};
+			const tools = rememberedTools(currentProfile);
+			const structure = dockStructure(dock, tools);
+			if (structure === currentStructure) return;
 			const value = WorkspaceLayoutSchema.parse({
 				version: 4,
-				scales: { ...scales },
-				tools: Object.fromEntries(
-					Object.entries(currentConfig.tools)
-						.filter(([, options]) => options.remember)
-						.map(([id]) => [id, !!toolOpen[id as WorkspaceTool]]),
-				),
+				scales: shared.values.get(currentProfile)?.value.scales,
+				tools,
 				locked: true,
-				dock: api.value.toJSON(),
+				dock,
 			});
+			currentStructure = structure;
 			shared.update(currentProfile, value, owner);
+			appliedLayout = shared.values.get(currentProfile)?.value;
 		} catch (cause) {
 			report(cause);
 		}
 	}
+
+	onScopeDispose(
+		shared.registerSession(props.session.id, () => {
+			if (props.active) capture();
+			return { ...presentation };
+		}),
+	);
 
 	function add(id: WorkspacePane) {
 		const dock = api.value;
@@ -166,18 +199,21 @@ export function useWorkspaceLayout(props: {
 	}
 
 	async function restore() {
-		if (!api.value || disposed) return;
-		const token = ++generation,
-			target = profile.value;
+		if (!api.value || disposed || !props.active || !viewport.width || !viewport.height) return;
+		const target = profile.value;
+		if (loaded.value && currentProfile === target && appliedLayout === shared.values.get(target)?.value) return;
+		const token = ++generation;
 		loaded.value = false;
 		restoring = true;
 		await shared.load(target);
 		const saved = shared.values.get(target)?.value;
 
-		if (disposed || token !== generation) return;
+		if (disposed || token !== generation || !props.active) return;
 		currentProfile = target;
+		appliedLayout = saved;
+		const local = presentation[target];
 		for (const id of Object.keys(scales) as WorkspacePane[]) delete scales[id];
-		Object.assign(scales, saved?.scales ?? {});
+		Object.assign(scales, local?.scales ?? saved?.scales ?? {});
 		// Editing is temporary UI state; reopening a session always uses normal mode.
 		locked.value = true;
 		// Restore persisted tools per profile; transient tools keep their live state and drafts.
@@ -189,9 +225,17 @@ export function useWorkspaceLayout(props: {
 				: (toolOpen[tool] ?? options.defaultOpen);
 		}
 		try {
-			if (saved) {
+			// Mounting or re-showing a tab can leave Dockview at 0×0 until its own observer runs.
+			// fromJSON fits the saved grid to the current viewport, so give it usable bounds first.
+			api.value.layout(
+				Math.max(viewport.width, api.value.minimumWidth),
+				Math.max(viewport.height, api.value.minimumHeight),
+			);
+			if (!saved) defaults();
+			const dock = saved?.dock ?? (local && api.value.toJSON());
+			if (dock) {
 				clearPanels();
-				api.value.fromJSON(saved.dock);
+				api.value.fromJSON(local ? withDockSizes(dock, local.sizes) : dock);
 				// Earlier layouts could hide panes or combine them behind a tab bar.
 				if (
 					!api.value.getPanel(config.value.primary) ||
@@ -200,14 +244,11 @@ export function useWorkspaceLayout(props: {
 					defaults();
 				for (const panel of [...api.value.panels])
 					if (!config.value.regions.includes(panel.id as WorkspacePane)) panel.api.close();
-				if (saved.version < 3 && profile.value !== 'compact' && !api.value.getPanel('commands'))
-					add('commands');
-				if (saved.version < 4 && profile.value !== 'compact' && !api.value.getPanel('status')) add('status');
 				for (const group of api.value.groups) group.header.hidden = locked.value;
 				for (const panel of api.value.panels) {
 					panelSubscriptions.set(panel.id, panel.api.onDidVisibilityChange(visible));
 				}
-			} else defaults();
+			}
 		} catch (cause) {
 			report(cause);
 			defaults();
@@ -216,9 +257,9 @@ export function useWorkspaceLayout(props: {
 		api.value.updateOptions({ locked: false, disableDnd: locked.value });
 		visible();
 		syncConstraints();
+		currentStructure = dockStructure(api.value.toJSON(), rememberedTools(target));
 		restoring = false;
 		loaded.value = true;
-		if (saved && saved.version < 4 && props.active) capture();
 	}
 
 	function ready(event: DockviewReadyEvent) {
@@ -235,11 +276,11 @@ export function useWorkspaceLayout(props: {
 			}),
 		);
 		subscriptions.push(
-			event.api.onDidLayoutChange(() => {
+			event.api.onDidLayoutChange(({ reasons }) => {
 				if (applyingConstraints) return;
 				syncConstraints();
 				visible();
-				if (props.active) capture();
+				if (props.active && (reasons.has('geometry') || reasons.has('structure'))) capture();
 			}),
 		);
 		void restore();
@@ -260,6 +301,7 @@ export function useWorkspaceLayout(props: {
 			return;
 		Object.assign(viewport, next);
 		syncConstraints();
+		if (!loaded.value && !restoring) void restore();
 	}
 
 	watch(profile, () => void restore());
@@ -267,12 +309,17 @@ export function useWorkspaceLayout(props: {
 		() => props.active,
 		(active) => {
 			if (active) void restore();
+			else {
+				capture();
+				generation++;
+				restoring = false;
+			}
 		},
 	);
 	watch(
 		() => shared.values.get(profile.value),
 		(entry) => {
-			if (entry && entry.owner !== owner && props.active) void restore();
+			if (entry?.owner !== owner && props.active) void restore();
 		},
 	);
 	watch(
@@ -295,6 +342,7 @@ export function useWorkspaceLayout(props: {
 
 	function reset() {
 		restoring = true;
+		if (currentProfile) delete presentation[currentProfile];
 		defaults();
 		restoring = false;
 		capture();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { onMounted, onScopeDispose, ref, watch, nextTick, computed, useId } from 'vue';
+	import { onMounted, onScopeDispose, ref, watch, nextTick, computed, inject, useId } from 'vue';
 	import { Terminal } from '@xterm/xterm';
 	import { FitAddon } from '@xterm/addon-fit';
 	import type { PluginContextApi } from 'nexus-terminal/browser';
@@ -17,6 +17,7 @@
 	import { useTerminalInteractions } from './terminal/use-terminal-interactions';
 	import { createTerminalEchoLayer } from './terminal/terminal-echo-layer';
 	import TerminalSelectionTools from './terminal/TerminalSelectionTools.vue';
+	import { panePresentationKey } from './presentation/pane-presentation';
 	const props = defineProps<{
 		session: SessionInfo;
 		transport: SessionTransport;
@@ -31,6 +32,8 @@
 	const inputId = useId();
 	const container = ref<HTMLElement>();
 	const catalog = useWorkspaceCatalog();
+	const presentation = inject(panePresentationKey, undefined);
+	const fontSize = computed(() => presentation?.scales.terminal ?? catalog.display.value.fontSizes[props.profile]);
 	const background = useWorkspaceBackground();
 	const hasBackground = computed(
 		() => background.settings.value.enabled && !!(background.imageUrl.value || background.html.value),
@@ -135,7 +138,13 @@
 
 		canInput: () => ready && props.transport.connected.value && !props.transport.terminalClosed.value,
 
-		fontSize: () => catalog.display.value.fontSizes[props.profile],
+		fontSize: () => fontSize.value,
+
+		onFontSizeChange(size) {
+			if (!presentation) return;
+			presentation.scales.terminal = size;
+			presentation.changed();
+		},
 
 		resize,
 
@@ -143,8 +152,8 @@
 
 		report: (code) => props.ctx.app.log.report({ level: 'error', code, userVisible: true }),
 	});
-	watch([() => props.profile, () => catalog.display.value.fontSizes[props.profile]], () => {
-		interactions.size.value = catalog.display.value.fontSizes[props.profile];
+	watch(fontSize, (size) => {
+		interactions.size.value = size;
 		resize();
 	});
 	watch(

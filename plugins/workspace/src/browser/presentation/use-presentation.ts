@@ -36,6 +36,10 @@ export function usePresentation(context: () => PresentationContext) {
 		get active() {
 			return context().active;
 		},
+
+		get session() {
+			return context().session;
+		},
 	});
 	const { config, toolOpen, panelVisibility, locked, loaded } = layout;
 	const transfers = useWorkspaceTransfers();

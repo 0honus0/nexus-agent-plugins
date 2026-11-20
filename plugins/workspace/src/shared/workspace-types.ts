@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WorkspaceSessionPresentationSchema } from './workspace-layout-types';
 
 export const SessionCreateSchema = z.strictObject({
 	connectionId: z.uuid(),
@@ -16,6 +17,7 @@ export const SessionSchema = z.object({
 	createdAt: z.number(),
 	terminal: z.enum(['running', 'closed']),
 	transfers: z.number().int().nonnegative(),
+	presentation: WorkspaceSessionPresentationSchema.optional(),
 });
 
 export const SessionListResponseSchema = z.object({ items: z.array(SessionSchema) });

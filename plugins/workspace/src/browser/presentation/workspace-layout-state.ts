@@ -1,7 +1,11 @@
 import { onScopeDispose, shallowReactive, type InjectionKey } from 'vue';
 import type { LayoutProfile } from '../../shared/layout-types.js';
 import type { PluginContextApi } from 'nexus-terminal/browser';
-import { WorkspaceLayoutResponseSchema, type WorkspaceLayout } from '../../shared/workspace-layout-types';
+import {
+	WorkspaceLayoutResponseSchema,
+	type WorkspaceLayout,
+	type WorkspaceSessionPresentation,
+} from '../../shared/workspace-layout-types';
 import { createWorkspaceClient } from '../workspace-client';
 
 /** One layout per width profile, shared by all windows in this plugin generation. */
@@ -9,12 +13,14 @@ function createLayoutState(ctx: PluginContextApi) {
 	const { request, report } = createWorkspaceClient(ctx, ctx.signal);
 	const values = shallowReactive(new Map<LayoutProfile, { value: WorkspaceLayout; owner?: symbol }>());
 	const reads = new Map<LayoutProfile, Promise<void>>();
+	const loaded = new Set<LayoutProfile>();
 	const pending = new Map<LayoutProfile, WorkspaceLayout>();
+	const sessions = new Map<string, () => WorkspaceSessionPresentation>();
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let saving = Promise.resolve();
 
 	async function load(profile: LayoutProfile) {
-		if (values.has(profile)) return;
+		if (values.has(profile) || loaded.has(profile)) return;
 		let reading = reads.get(profile);
 		if (!reading) {
 			reading = (async () => {
@@ -25,7 +31,9 @@ function createLayoutState(ctx: PluginContextApi) {
 						undefined,
 						WorkspaceLayoutResponseSchema,
 					);
-					if (!ctx.signal.aborted && raw && !values.has(profile)) values.set(profile, { value: raw });
+					if (ctx.signal.aborted) return;
+					loaded.add(profile);
+					if (raw && !values.has(profile)) values.set(profile, { value: raw });
 				} catch (cause) {
 					report(cause);
 				} finally {
@@ -43,6 +51,19 @@ function createLayoutState(ctx: PluginContextApi) {
 		pending.set(profile, value);
 		clearTimeout(timer);
 		timer = setTimeout(() => ctx.app.tasks.background('save-workspace-layout', flush), 350);
+	}
+
+	function registerSession(id: string, snapshot: () => WorkspaceSessionPresentation) {
+		sessions.set(id, snapshot);
+		return () => {
+			if (sessions.get(id) === snapshot) sessions.delete(id);
+		};
+	}
+
+	async function prepareSuspend(id: string) {
+		const presentation = sessions.get(id)?.();
+		await flush();
+		return presentation;
 	}
 
 	function flush() {
@@ -67,12 +88,16 @@ function createLayoutState(ctx: PluginContextApi) {
 							WorkspaceLayoutResponseSchema,
 						);
 						if (ctx.signal.aborted || values.get(profile)?.value !== value) continue;
+						loaded.add(profile);
 						if (raw) values.set(profile, { value: raw });
 						else values.delete(profile);
 					} catch (readError) {
 						if (!ctx.signal.aborted) {
 							report(readError);
-							if (values.get(profile)?.value === value) values.delete(profile);
+							if (values.get(profile)?.value === value) {
+								loaded.delete(profile);
+								values.delete(profile);
+							}
 						}
 					}
 				}
@@ -89,7 +114,7 @@ function createLayoutState(ctx: PluginContextApi) {
 		},
 		{ once: true },
 	);
-	return { values, load, update, flush };
+	return { values, load, update, flush, registerSession, prepareSuspend };
 }
 
 const layouts = new WeakMap<PluginContextApi, ReturnType<typeof createLayoutState>>();

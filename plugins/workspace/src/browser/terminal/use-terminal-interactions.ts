@@ -13,6 +13,7 @@ export function useTerminalInteractions(options: {
 	active(): boolean;
 	canInput(): boolean;
 	fontSize?(): number;
+	onFontSizeChange?(size: number): void;
 	resize(): void;
 	onPaste?(): void;
 	report(code: string): void;
@@ -103,9 +104,10 @@ export function useTerminalInteractions(options: {
 		max: 40,
 		enabled: options.active,
 
-		onChange() {
+		onChange(size) {
 			selection.clear();
 			menu.value = undefined;
+			options.onFontSizeChange?.(size);
 			options.resize();
 		},
 	});

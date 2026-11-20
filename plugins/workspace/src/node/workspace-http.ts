@@ -8,12 +8,15 @@ import { workspaceHttp } from './workspace-http-options.js';
 import type { PluginHttpApi, PluginLogApi, PluginScopeApi } from 'nexus-terminal/node';
 import { SessionCreateResultSchema } from '../shared/workspace-types.js';
 import { WorkspaceError } from './workspace-error.js';
+import { WorkspaceSessionPresentationSchema } from '../shared/workspace-layout-types';
 
 const postTransfersIdCancelInput = z.object({ id: z.uuid() });
 
 const postTransfersIdRetryInput = TransferRetrySchema.safeExtend({ id: z.uuid() });
 
 const deleteTransfersHistoryInput = z.strictObject({});
+
+const suspendSessionInput = z.object({ id: z.uuid(), presentation: WorkspaceSessionPresentationSchema.optional() });
 
 export function registerWorkspaceSessionHttp(
 	http: PluginHttpApi,
@@ -121,14 +124,14 @@ export function registerWorkspaceSessionHttp(
 		{
 			method: 'post',
 			path: '/sessions/:id/suspend',
-			input: postTransfersIdCancelInput,
+			input: suspendSessionInput,
 			output: SessionSchema,
 			status: 200,
 			lifetime,
 
-			handler: (input: z.output<typeof postTransfersIdCancelInput>, signal: AbortSignal) =>
+			handler: (input: z.output<typeof suspendSessionInput>, signal: AbortSignal) =>
 				workspaceHttp(log, signal, async () => {
-					return service.suspend(input.id);
+					return service.suspend(input.id, input.presentation);
 				}),
 		},
 	] as const);

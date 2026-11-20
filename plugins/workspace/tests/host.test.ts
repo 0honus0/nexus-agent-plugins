@@ -13,6 +13,7 @@ import {
 	verifyTerminalSelection,
 	verifyWorkspaceAppearance,
 	verifyWorkspacePanels,
+	verifyWorkspaceSessionPresentation,
 	verifyWorkspaceTransfers,
 } from './browser/workspace-browser-checks.js';
 import { BackgroundSnapshotSchema } from '../src/shared/workspace-background-types.js';
@@ -156,7 +157,7 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	const homeAsset = Promise.withResolvers<void>();
 	const sessionAsset = Promise.withResolvers<void>();
 	const catalog = Promise.withResolvers<void>();
-	const statusSample = Promise.withResolvers<void>();
+	let statusSample = Promise.withResolvers<void>();
 	const workspaceCatalog = Promise.withResolvers<void>();
 	const handshakeStarted = Promise.withResolvers<void>();
 	const releaseHandshake = Promise.withResolvers<void>();
@@ -258,6 +259,9 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 		const loading = workspace.locator('.status-loading[role="status"]');
 		await browserExpect(loading).toBeVisible();
 		await browserExpect(loading.locator('.status-loading-spinner')).toBeVisible();
+		await browserExpect(
+			workspace.getByRole('button', { name: 'Copy server address: sdk-repository.test' }),
+		).toBeVisible();
 	} finally {
 		statusSample.resolve();
 	}
@@ -292,6 +296,10 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	channels[0].write('audit selectable');
 	await verifyTerminalSelection(workspace);
 	await verifyWorkspacePanels(page, workspace, host);
+	await verifyWorkspaceSessionPresentation(page, workspace, host, () => {
+		statusSample = Promise.withResolvers<void>();
+		return statusSample.resolve;
+	});
 	await verifyWorkspaceAppearance(page, workspace, host);
 
 	const destinationConnection = z.object({ id: z.uuid() }).parse(
@@ -319,7 +327,7 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	);
 	if (destinationSession.result.state !== 'created') throw new Error('WORKSPACE_TEST_DESTINATION_NOT_CREATED');
 	const source = SessionListResponseSchema.parse(await host.json(base + '/sessions')).items.find(
-		(item) => item.state === 'attached',
+		(item) => item.state === 'attached' && item.presentation,
 	)!;
 	await verifyWorkspaceTransfers(page, workspace, {
 		sourceId: source.id,
@@ -391,10 +399,7 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	await workspace.getByRole('button', { name: 'Workspace test SSH', exact: true }).click();
 	await browserExpect(workspace.locator('.xterm')).toBeVisible();
 	expect((await appearanceReload).status()).toBe(200);
-	await browserExpect(workspace.locator('.workspace-file-list')).toHaveCSS(
-		'transform',
-		'matrix(1.1, 0, 0, 1.1, 0, 0)',
-	);
+	await browserExpect(workspace.locator('.workspace-file-list')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
 
 	await setEnabled(host, '@nexus-terminal/connections', false);
 	await browserExpect(workspace).toBeVisible();

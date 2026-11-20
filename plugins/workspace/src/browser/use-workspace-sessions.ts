@@ -9,12 +9,14 @@ import {
 	type SessionInfo,
 } from '../shared/workspace-types';
 import { createWorkspaceClient } from './workspace-client';
+import type { WorkspaceSessionPresentation } from '../shared/workspace-layout-types';
 
 /** View navigation never releases a session. Only close, suspend or view disposal changes ownership. */
 export function useWorkspaceSessions(props: {
 	ctx: PluginContextApi;
 	view: PluginWindowApi;
 	hasTransfers?: (id?: string) => boolean;
+	prepareSuspend?: (id: string) => Promise<WorkspaceSessionPresentation | undefined>;
 }) {
 	const connections = shallowRef<ConnectionsClientApi>(),
 		sessions = ref<SessionInfo[]>([]),
@@ -253,7 +255,11 @@ export function useWorkspaceSessions(props: {
 			// local tab before an ordinary window close can clean up remaining tabs.
 			await props.ctx.app.tasks.run(
 				async (lifetime) => {
-					await createWorkspaceClient(props.ctx, lifetime).request('sessions/' + id + '/suspend', 'POST');
+					const presentation = await props.prepareSuspend?.(id);
+					lifetime.throwIfAborted();
+					await createWorkspaceClient(props.ctx, lifetime).request('sessions/' + id + '/suspend', 'POST', {
+						presentation,
+					});
 					lifetime.throwIfAborted();
 					tabs.value = tabs.value.filter((s) => s.id !== id);
 					if (active.value === id) active.value = 'home';

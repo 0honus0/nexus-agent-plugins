@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
 import type { startHost } from '../../../test/tests/host.js';
 import { BackgroundSnapshotSchema } from '../../src/shared/workspace-background-types.js';
-import { WorkspaceLayoutResponseSchema } from '../../src/shared/workspace-layout-types.js';
 import { WorkspacePathHistorySchema } from '../../src/shared/workspace-path-history-types.js';
 import { TransferTaskSchema } from '../../src/shared/workspace-transfer-types.js';
 import { SessionListResponseSchema } from '../../src/shared/workspace-types.js';
@@ -275,15 +274,6 @@ export async function verifyWorkspacePanels(page: Page, workspace: Locator, host
 	}
 	await expect(list).toHaveCSS('transform', 'matrix(1.1, 0, 0, 1.1, 0, 0)');
 	await expect.poll(async () => (await entry.boundingBox())!.height).toBeGreaterThan(fileRow.height);
-	const profile = await workspace.locator('.workspace-surface').getAttribute('data-profile');
-	await expect
-		.poll(
-			async () =>
-				WorkspaceLayoutResponseSchema.parse(await host.json(base + '/layouts/' + profile)).layout?.scales
-					?.files,
-		)
-		.toBe(1.1);
-
 	const ids = SessionListResponseSchema.parse(await host.json(base + '/sessions')).items.map((session) => session.id);
 	const divider = workspace
 		.locator('.dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:visible')
@@ -312,6 +302,95 @@ export async function verifyWorkspacePanels(page: Page, workspace: Locator, host
 		).toEqual(ids);
 	}
 	await expect(list).toHaveCSS('transform', 'matrix(1.1, 0, 0, 1.1, 0, 0)');
+}
+
+export async function verifyWorkspaceSessionPresentation(
+	page: Page,
+	workspace: Locator,
+	host: Host,
+	pauseStatus: () => () => void,
+): Promise<void> {
+	const active = workspace.locator('.workspace-tab-panel[data-state="active"]');
+	const files = active.locator('.workspace-file-list');
+	const terminal = active.locator('.workspace-terminal-slot');
+	const terminalRows = terminal.locator('.xterm-rows');
+	const commands = active.locator('[data-pane="commands"]');
+	const address = active.getByRole('button', { name: 'Copy server address: sdk-repository.test' });
+
+	const width = async () => (await terminal.boundingBox())!.width;
+
+	const session = SessionListResponseSchema.parse(await host.json(base + '/sessions')).items[0];
+	const profile = await active.locator('.workspace-surface').getAttribute('data-profile');
+
+	await workspace.getByRole('button', { name: 'New session', exact: true }).click();
+	await workspace.getByRole('button', { name: 'Workspace test SSH', exact: true }).click();
+	const first = workspace.getByRole('tab', { name: 'Workspace test SSH · 1', exact: true });
+	const second = workspace.getByRole('tab', { name: 'Workspace test SSH · 2', exact: true });
+	await expect(second).toHaveAttribute('aria-selected', 'true');
+	await expect(address).toBeVisible();
+	await expect(files).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+	const secondWidth = await width();
+
+	const releaseStatus = pauseStatus();
+	try {
+		await first.click();
+		await expect(address).toBeVisible();
+		await expect(active.locator('.metric-row')).toHaveCount(5);
+	} finally {
+		releaseStatus();
+	}
+	await expect(files).toHaveCSS('transform', 'matrix(1.1, 0, 0, 1.1, 0, 0)');
+	const before = await width();
+	const divider = active
+		.locator('.dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:visible')
+		.first();
+	const bounds = (await divider.boundingBox())!;
+	await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(bounds.x + bounds.width / 2 - 30, bounds.y + bounds.height / 2, { steps: 6 });
+	await page.mouse.up();
+	await expect.poll(async () => Math.abs((await width()) - before)).toBeGreaterThan(5);
+	const firstWidth = await width();
+
+	await second.click();
+	await expect.poll(width).toBeCloseTo(secondWidth, 0);
+	await first.click();
+	await expect.poll(width).toBeCloseTo(firstWidth, 0);
+	await expect(commands).toBeVisible();
+	await workspace.getByRole('button', { name: 'Layout', exact: true }).click();
+	await page.getByRole('menuitem', { name: 'Quick commands', exact: true }).click();
+	await expect(commands).toHaveCount(0);
+	await second.click();
+	await expect(commands).toHaveCount(0);
+	await expect.poll(width).toBeCloseTo(secondWidth, 0);
+	await expect(files).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+
+	await first.click();
+	await expect(commands).toHaveCount(0);
+	await expect(files).toHaveCSS('transform', 'matrix(1.1, 0, 0, 1.1, 0, 0)');
+	const suspendedWidth = await width();
+	const fontSize = await terminalRows.evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+	await active.locator('.workspace-terminal').dispatchEvent('wheel', { ctrlKey: true, deltaY: -90 });
+	await expect(terminalRows).toHaveCSS('font-size', `${fontSize + 1}px`);
+	await first.click({ button: 'right' });
+	await page.getByRole('menuitem', { name: 'Suspend session', exact: true }).click();
+	await expect(first).toHaveCount(0);
+	await workspace.getByRole('button', { name: 'New session', exact: true }).click();
+	const resume = workspace.getByRole('button', { name: 'Resume · Workspace test SSH', exact: true });
+	await expect(resume).toBeVisible();
+	const suspended = SessionListResponseSchema.parse(await host.json(base + '/sessions')).items.find(
+		(item) => item.id === session.id,
+	);
+	expect(suspended).toMatchObject({
+		state: 'suspended',
+		presentation: { [profile!]: { scales: { files: 1.1, terminal: fontSize + 1 } } },
+	});
+	await resume.click();
+	await expect.poll(width, { message: JSON.stringify(suspended?.presentation) }).toBeCloseTo(suspendedWidth, 0);
+	await expect(files).toHaveCSS('transform', 'matrix(1.1, 0, 0, 1.1, 0, 0)');
+	await expect(terminalRows).toHaveCSS('font-size', `${fontSize + 1}px`);
+	await expect(commands).toHaveCount(0);
+	await workspace.getByRole('button', { name: 'Close tab Workspace test SSH · 1', exact: true }).click();
 }
 
 export async function verifyTerminalSelection(workspace: Locator): Promise<void> {

@@ -4,7 +4,6 @@
 	import type { PluginContextApi, PluginWindowApi } from 'nexus-terminal/browser';
 	import type { SessionInfo } from '../shared/workspace-types';
 	import type { WorkspaceI18n } from './workspace-i18n';
-	import { createWorkspaceLayoutState, workspaceLayoutStateKey } from './presentation/workspace-layout-state';
 	import { createWorkspaceCatalog, workspaceCatalogKey } from './catalog/workspace-catalog';
 	import { createWorkspaceBackground, workspaceBackgroundKey } from './appearance/workspace-background';
 	import { createCommandTargets, commandTargetsKey } from './commands/command-targets';
@@ -23,7 +22,6 @@
 	provide(workspaceBackgroundKey, createWorkspaceBackground(props.ctx, props.view));
 	provide(commandTargetsKey, createCommandTargets());
 	provide(workspaceCatalogKey, createWorkspaceCatalog(props.ctx));
-	provide(workspaceLayoutStateKey, createWorkspaceLayoutState(props.ctx));
 </script>
 
 <template>

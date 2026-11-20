@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { SerializedDockview } from 'dockview-vue';
+import { LayoutProfileSchema } from './layout-types';
 
 export const WorkspacePaneSchema = z.enum(['terminal', 'files', 'commands', 'status']);
 
@@ -78,11 +79,13 @@ export const WorkspaceDockSchema = z
 	})
 	.transform((value) => value as unknown as SerializedDockview);
 
+const PaneScalesSchema = z.object({ status: PaneScaleSchema.optional(), files: PaneScaleSchema.optional() });
+
 export const WorkspaceLayoutSchema = z.object({
 	version: z.literal(4),
 	tools: z.partialRecord(WorkspaceToolSchema, z.boolean()).optional(),
 	/** Per-width-profile presentation choices. */
-	scales: z.object({ status: PaneScaleSchema.optional(), files: PaneScaleSchema.optional() }).optional(),
+	scales: PaneScalesSchema.optional(),
 	locked: z.boolean(),
 	dock: WorkspaceDockSchema,
 });
@@ -90,3 +93,15 @@ export const WorkspaceLayoutSchema = z.object({
 export type WorkspaceLayout = z.infer<typeof WorkspaceLayoutSchema>;
 
 export const WorkspaceLayoutResponseSchema = z.object({ layout: WorkspaceLayoutSchema.nullable() });
+
+export const WorkspaceSessionPresentationSchema = z.partialRecord(
+	LayoutProfileSchema,
+	z.object({
+		sizes: z
+			.record(z.string().max(48), z.number().min(0).max(1))
+			.refine((sizes) => Object.keys(sizes).length <= 32),
+		scales: PaneScalesSchema.extend({ terminal: z.number().min(8).max(40).optional() }),
+	}),
+);
+
+export type WorkspaceSessionPresentation = z.infer<typeof WorkspaceSessionPresentationSchema>;

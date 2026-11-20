@@ -13,8 +13,11 @@
 	import WorkspaceLoading from './WorkspaceLoading.vue';
 	import WorkspaceHome from './WorkspaceHome.vue';
 	import { useWorkspaceSessions } from './use-workspace-sessions';
+	import { createWorkspaceLayoutState, workspaceLayoutStateKey } from './presentation/workspace-layout-state';
 	const props = defineProps<PluginWindowProps & { ctx: PluginContextApi; i18n: WorkspaceI18n }>();
 	const { t } = props.i18n;
+	const layouts = createWorkspaceLayoutState(props.ctx);
+	provide(workspaceLayoutStateKey, layouts);
 	let sessionModule: Promise<typeof import('./WorkspaceSessionTabs.vue')> | undefined;
 
 	function loadSessionTabs() {
@@ -80,7 +83,7 @@
 		connect,
 		close,
 		suspend,
-	} = useWorkspaceSessions({ ...props, hasTransfers: transfers.hasPending });
+	} = useWorkspaceSessions({ ...props, hasTransfers: transfers.hasPending, prepareSuspend: layouts.prepareSuspend });
 
 	watch(
 		connecting,
