@@ -1,6 +1,6 @@
 {
   "name": "@nexus-terminal/workspace",
-  "version": "0.0.1-dev.2",
+  "version": "0.0.1-dev.3",
   "type": "module",
   "description": "SSH terminals, files, server status and quick commands",
   "files": [
@@ -18,6 +18,7 @@
   },
   "nexus": {
     "kind": "application",
+    "icon": "square-terminal",
     "entry": {
       "backend": "dist/node/index.js",
       "frontend": "dist/browser/index.js"

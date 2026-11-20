@@ -279,7 +279,7 @@ it('isolates channel denial from the other requests on the connection', { timeou
 	assert.equal(connection.getState().state, 'connected');
 });
 
-it('handles invalid options, forced DNS family and handshake timeout', { timeout: 8000 }, async () => {
+it('handles invalid options, forced DNS family and an authentication timeout', { timeout: 8000 }, async () => {
 	await assert.rejects(ssh.connect({ ...options(), privateKey: 'invalid' }), {
 		code: 'SSH_INVALID_OPTIONS',
 	});
@@ -373,11 +373,62 @@ it('observes remote disconnect and preserves socket errors as causes', { timeout
 	const unusedPort = (listener.address() as AddressInfo).port;
 	await new Promise<void>((resolve) => listener.close(() => resolve()));
 	await assert.rejects(ssh.connect({ ...options(), port: unusedPort }), (error: Error & { code: string }) => {
-		assert.equal(error.code, 'SSH_CONNECTION_FAILED');
+		assert.equal(error.code, 'SSH_CONNECTION_REFUSED');
 		assert.equal((error.cause as NodeJS.ErrnoException).code, 'ECONNREFUSED');
 		assert.doesNotMatch(JSON.stringify(error), /127\.0\.0\.1/u);
 		return true;
 	});
+	await assert.rejects(ssh.connect({ ...options(), host: 'nexus-diagnostic.invalid' }), {
+		code: 'SSH_HOST_LOOKUP_FAILED',
+	});
+	assert.doesNotMatch(JSON.stringify(logs), /127\.0\.0\.1|nexus-diagnostic\.invalid/u);
+});
+
+it('identifies a TCP peer closing before SSH identification', { timeout: 8000 }, async () => {
+	const listener = createServer((socket) => {
+		socket.on('error', () => {});
+		socket.once('data', () => socket.end());
+	});
+	await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
+	try {
+		await assert.rejects(ssh.connect({ ...options(), port: (listener.address() as AddressInfo).port }), {
+			code: 'SSH_HANDSHAKE_CLOSED',
+		});
+	} finally {
+		await new Promise<void>((resolve) => listener.close(() => resolve()));
+	}
+});
+
+it('distinguishes an SSH handshake timeout from a TCP connection timeout', { timeout: 8000 }, async () => {
+	const listener = createServer((socket) => socket.resume());
+	await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
+	try {
+		await assert.rejects(
+			ssh.connect({ ...options(), port: (listener.address() as AddressInfo).port, readyTimeout: 100 }),
+			{ code: 'SSH_HANDSHAKE_TIMEOUT' },
+		);
+	} finally {
+		await new Promise<void>((resolve) => listener.close(() => resolve()));
+	}
+});
+
+it('reports when the SSH client and server have no common algorithm', { timeout: 8000 }, async () => {
+	const listener = new ssh2.Server({ hostKeys: [hostKey], algorithms: { cipher: ['aes128-ctr'] } }, (peer) => {
+		peer.on('error', () => {});
+	});
+	await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
+	try {
+		await assert.rejects(
+			ssh.connect({
+				...options(),
+				port: (listener.address() as AddressInfo).port,
+				algorithms: { cipher: ['aes128-gcm@openssh.com'] },
+			}),
+			{ code: 'SSH_ALGORITHM_MISMATCH' },
+		);
+	} finally {
+		await new Promise<void>((resolve) => listener.close(() => resolve()));
+	}
 });
 
 it('parses a private key and rejects public keys and invalid passphrases', () => {

@@ -1,7 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import { it } from 'vitest';
 import { manager as marketplaceManager, pluginFixture, startHost } from '../../test/tests/host.js';
-import { expectFormFields } from '../../test/tests/browser-checks.js';
+import { collectBrowserErrors, expectFormFields } from '../../test/tests/browser-checks.js';
 import { OidcStatusSchema } from '../src/shared/oidc-http-types.js';
 import { startProvider } from './fixtures/oidc-provider.js';
 
@@ -25,6 +25,7 @@ it('configures the provider, accepts only a valid signature for the configured s
 	});
 	resources.defer(() => browser.close());
 	const page = await browser.newPage({ locale: 'en-US', ignoreHTTPSErrors: true });
+	const errors = collectBrowserErrors(page);
 	page.setDefaultTimeout(8000);
 	await page.goto(host.origin);
 	await expect(page.getByRole('button', { name: 'OpenID Connect', exact: true })).toHaveCount(0);
@@ -48,6 +49,23 @@ it('configures the provider, accepts only a valid signature for the configured s
 	} finally {
 		initialConfig.resolve();
 	}
+	await expect(app.getByRole('heading', { name: 'Identity provider' })).toBeVisible();
+	await expect(app.getByRole('heading', { name: 'Sign-in and redirect' })).toBeVisible();
+	const clientFields = app.locator('.oidc-fields').first();
+
+	const fieldsShareRow = () =>
+		clientFields.evaluate((row) => {
+			const [first, second] = [...row.children].map((field) => field.getBoundingClientRect());
+			return first!.top === second!.top && first!.right <= second!.left;
+		});
+
+	await expect.poll(fieldsShareRow).toBe(true);
+	const wideViewport = page.viewportSize()!;
+	await page.setViewportSize({ width: 420, height: 800 });
+	await expect.poll(fieldsShareRow).toBe(false);
+	await expect(app.getByRole('button', { name: 'Save configuration', exact: true })).toBeVisible();
+	await page.setViewportSize(wideViewport);
+
 	await app.getByLabel('Issuer URL', { exact: true }).fill(provider.issuer);
 	await app.getByLabel('Client ID', { exact: true }).fill(provider.clientId);
 	await app.getByLabel('Client secret', { exact: true }).fill(provider.secret);
@@ -95,4 +113,5 @@ it('configures the provider, accepts only a valid signature for the configured s
 	const replay = await page.request.get(acceptedResponse.url(), { maxRedirects: 0 });
 	expect(replay.headers().location).toBe('/login?oidc=failed');
 	expect(provider.tokensIssued).toBe(3);
+	expect(errors).toEqual([]);
 }, 60_000);

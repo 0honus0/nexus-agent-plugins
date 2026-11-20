@@ -1,6 +1,6 @@
 {
   "name": "@nexus-terminal/connections",
-  "version": "0.0.1-dev.3",
+  "version": "0.0.1-dev.4",
   "type": "module",
   "description": "Manage SSH, RDP and VNC connections",
   "displayName": "Connections",
@@ -29,6 +29,7 @@
   },
   "nexus": {
     "kind": "application",
+    "icon": "server",
     "entry": {
       "backend": "dist/node/index.js",
       "frontend": "dist/browser/index.js"

@@ -78,6 +78,21 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 			201,
 		),
 	);
+	await host.json(
+		resource('connections') + '/connections',
+		{
+			connection: {
+				name: 'Closed SSH port',
+				host: '127.0.0.1',
+				port: 1,
+				type: 'ssh',
+				credentialId: credential.id,
+				tags: [],
+			},
+		},
+		'POST',
+		201,
+	);
 
 	expect(await host.json(base + '/layouts/compact')).toEqual({ layout: null });
 	expect(await host.json(base + '/catalog')).toMatchObject({ favorites: [], commands: [], themes: [] });
@@ -146,7 +161,7 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	const handshakeStarted = Promise.withResolvers<void>();
 	const releaseHandshake = Promise.withResolvers<void>();
 	await page.route('**' + base + '/sessions', async (route) => {
-		if (route.request().method() === 'POST') {
+		if (route.request().method() === 'POST' && route.request().postDataJSON().connectionId === connection.id) {
 			handshakeStarted.resolve();
 			await releaseHandshake.promise;
 		}
@@ -205,13 +220,24 @@ it('installs and opens Workspace, confirms a host key and streams terminal and f
 	await workspace.getByRole('button', { name: 'Retry', exact: true }).click();
 	await browserExpect(workspace.getByText('Workspace test SSH', { exact: true })).toBeVisible();
 	const groupHeading = workspace.locator('.workspace-group-heading');
-	await browserExpect(groupHeading.locator('[data-ui="badge"]')).toHaveText('1');
+	await browserExpect(groupHeading.locator('[data-ui="badge"]')).toHaveText('2');
 	await browserExpect(groupHeading).toHaveAttribute('aria-expanded', 'true');
 
 	const filters = workspace.locator('.workspace-home-filters');
 	const inputBounds = await filters.locator('[data-ui="input"]').boundingBox();
 	const selectBounds = await filters.locator('[data-ui="select"]').boundingBox();
 	expect(inputBounds!.height).toBe(selectBounds!.height);
+
+	const refused = page.waitForResponse(
+		(response) => new URL(response.url()).pathname === base + '/sessions' && response.status() === 502,
+	);
+	await workspace.getByRole('button', { name: 'Closed SSH port', exact: true }).click();
+	expect(await (await refused).json()).toMatchObject({ code: 'SSH_CONNECTION_REFUSED' });
+	await browserExpect(
+		page
+			.locator('[data-ui="toast"]')
+			.getByText('The TCP connection was refused. Check the port and whether SSH is listening.'),
+	).toBeVisible();
 
 	await workspace.getByRole('button', { name: 'Workspace test SSH', exact: true }).click();
 	const confirmation = page.getByRole('dialog', { name: 'Verify server identity' });

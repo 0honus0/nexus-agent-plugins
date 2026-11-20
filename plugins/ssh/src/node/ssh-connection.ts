@@ -4,22 +4,54 @@ import { Socket } from 'node:net';
 import type { PluginLogApi } from 'nexus-terminal/node';
 import ssh2, { type ClientChannel, type ExecOptions, type SFTPWrapper } from 'ssh2';
 import type { SshConnectOptions, SshConnectionApi, SshConnectionState, SshShellOptions } from './ssh-api.js';
-import { SshError } from './ssh-error.js';
+import { SshError, type SshErrorCode } from './ssh-error.js';
 
 type Channel = ClientChannel | SFTPWrapper;
 
 type HostVerifier = (key: Buffer | string, done: (accepted: boolean) => void) => boolean | void;
 
-function connectionError(cause: Error & { level?: string }, hostRejected: boolean): SshError {
+const socketCodes = new Map<string, SshErrorCode>([
+	['ECONNREFUSED', 'SSH_CONNECTION_REFUSED'],
+	['ECONNRESET', 'SSH_CONNECTION_RESET'],
+	['ETIMEDOUT', 'SSH_CONNECTION_TIMEOUT'],
+	['ENOTFOUND', 'SSH_HOST_LOOKUP_FAILED'],
+	['EAI_AGAIN', 'SSH_HOST_LOOKUP_FAILED'],
+	['EHOSTUNREACH', 'SSH_HOST_UNREACHABLE'],
+	['ENETUNREACH', 'SSH_HOST_UNREACHABLE'],
+]);
+
+function socketErrorCode(cause: Error): SshErrorCode | undefined {
+	// 多地址拨号有不同结果时，单个地址的错误不足以解释整次失败。
+	const errors: unknown[] = cause instanceof AggregateError ? cause.errors : [cause];
+	const codes = new Set(
+		errors.map((error) =>
+			error instanceof Error && 'code' in error && typeof error.code === 'string'
+				? socketCodes.get(error.code)
+				: undefined,
+		),
+	);
+	if (codes.size === 1) return codes.values().next().value;
+}
+
+function connectionError(cause: Error & { level?: string }, hostRejected: boolean, handshaking: boolean): SshError {
 	if (hostRejected) return new SshError('SSH_HOST_KEY_REJECTED', { cause });
 	switch (cause.level) {
 		case 'client-authentication':
 			return new SshError('SSH_AUTHENTICATION_FAILED', { cause });
 		case 'client-timeout':
-			return new SshError('SSH_CONNECTION_TIMEOUT', { cause });
-		default:
-			return new SshError('SSH_CONNECTION_FAILED', { cause });
+			return new SshError(handshaking ? 'SSH_HANDSHAKE_TIMEOUT' : 'SSH_CONNECTION_TIMEOUT', { cause });
+		case 'client-socket':
+			return new SshError(socketErrorCode(cause) ?? 'SSH_CONNECTION_FAILED', { cause });
+		case 'protocol':
+			if (cause.message === 'Connection lost before handshake')
+				return new SshError('SSH_HANDSHAKE_CLOSED', { cause });
+			break;
+		case 'handshake':
+			if (cause.message.startsWith('Handshake failed: no matching '))
+				return new SshError('SSH_ALGORITHM_MISMATCH', { cause });
+			break;
 	}
+	return new SshError('SSH_CONNECTION_FAILED', { cause });
 }
 
 /** 每条连接拥有自己的传输、握手和通道。连接关闭后拒绝所有等待中的请求。 */
@@ -58,7 +90,10 @@ export class SshConnection implements SshConnectionApi {
 			}
 
 			let hostRejected = false;
-			this.#client.on('error', (cause) => this.#fail(connectionError(cause, hostRejected)));
+			let handshaking = false;
+			this.#client.once('connect', () => (handshaking = true));
+			this.#client.once('handshake', () => (handshaking = false));
+			this.#client.on('error', (cause) => this.#fail(connectionError(cause, hostRejected, handshaking)));
 			this.#client.once('ready', () => {
 				if (!this.#pending.delete(reject)) return;
 				this.#ready = true;

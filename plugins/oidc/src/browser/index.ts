@@ -17,6 +17,7 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 				id: 'main',
 				label: messages.en.title,
 				component: defineAsyncComponent(() => import('./OidcApp.vue')),
+				defaultWindowSize: { width: 840, height: 700 },
 				scrollMode: 'window',
 			},
 		],

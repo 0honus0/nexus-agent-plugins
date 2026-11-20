@@ -1,8 +1,8 @@
 <script setup lang="ts">
-	import { Copy, Save, Trash2 } from '@lucide/vue';
+	import { Copy, KeyRound, Link2, Save, Trash2 } from '@lucide/vue';
 	import type { PluginWindowProps } from 'nexus-terminal/browser';
-	import { UiBadge, UiButton, UiDialog, UiField, UiInput, UiSelect } from 'nexus-terminal/browser/ui';
-	import { computed, onMounted, ref } from 'vue';
+	import { UiBadge, UiButton, UiDialog, UiField, UiInput, UiSection, UiSelect } from 'nexus-terminal/browser/ui';
+	import { computed, onMounted, ref, useId } from 'vue';
 	import { useI18n } from 'vue-i18n';
 	import {
 		OidcConfigInputSchema,
@@ -15,14 +15,15 @@
 
 	const { context, view } = defineProps<PluginWindowProps>();
 	const { t } = useI18n({ useScope: 'local', messages });
+	const issuerId = useId();
 	const status = ref<Awaited<ReturnType<typeof loadStatus>>>();
 	const form = ref<OidcConfigInput>(blankForm());
 	const working = ref(false);
 	const formDisabled = computed(() => !status.value || working.value);
 	const confirming = ref(false);
 	const methods = computed(() => [
-		{ value: 'client_secret_basic', label: 'client_secret_basic' },
-		{ value: 'client_secret_post', label: 'client_secret_post' },
+		{ value: 'client_secret_basic', label: t('basicAuthentication') },
+		{ value: 'client_secret_post', label: t('bodyAuthentication') },
 		{ value: 'none', label: t('publicClient') },
 	]);
 	const redirectUri = computed(() => {
@@ -118,63 +119,92 @@
 
 <template>
 	<form class="oidc-app" :aria-busy="working" @submit.prevent="save">
-		<UiBadge v-if="status?.config" tone="success">{{ t('configured') }}</UiBadge>
-		<UiField id="oidc-issuer" :label="t('issuer')">
-			<UiInput
-				id="oidc-issuer"
-				v-model="form.issuer"
-				type="url"
-				placeholder="https://id.example.com"
-				:disabled="formDisabled"
-				required
-			/>
-		</UiField>
-		<UiField :label="t('clientId')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.clientId" :disabled="formDisabled" required />
-		</UiField>
-		<UiField :label="t('authMethod')" v-slot="{ id }">
-			<UiSelect v-model="form.authMethod" :id="id" :options="methods" :disabled="formDisabled" block />
-		</UiField>
-		<UiField v-if="form.authMethod !== 'none'" :label="t('clientSecret')" v-slot="{ id }">
-			<UiInput
-				:id="id"
-				v-model="form.clientSecret"
-				type="password"
-				autocomplete="new-password"
-				:disabled="formDisabled"
-				:placeholder="
-					status?.config?.authMethod !== 'none' &&
-					status?.config?.issuer === form.issuer &&
-					status?.config?.clientId === form.clientId
-						? t('keepSecret')
-						: undefined
-				"
-			/>
-		</UiField>
-		<UiField :label="t('subject')" :hint="t('subjectHint')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.subject" :disabled="formDisabled" required />
-		</UiField>
-		<UiField :label="t('origin')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.origin" type="url" :disabled="formDisabled" required />
-		</UiField>
-		<UiField v-if="redirectUri" :label="t('callback')" :hint="t('callbackHint')" v-slot="{ id }">
-			<UiInput :id="id" :model-value="redirectUri" readonly>
-				<template #trailing>
-					<UiButton type="button" appearance="ghost" icon-only :aria-label="t('copy')" @click="copyRedirect">
-						<Copy :size="16" />
-					</UiButton>
-				</template>
-			</UiInput>
-		</UiField>
+		<UiSection appearance="panel" :title="t('provider')" :icon="KeyRound">
+			<template v-if="status?.config" #actions>
+				<UiBadge tone="success" dot>{{ t('configured') }}</UiBadge>
+			</template>
+			<template #default>
+				<div class="oidc-fields">
+					<UiField :id="issuerId" :label="t('issuer')">
+						<UiInput
+							:id="issuerId"
+							v-model="form.issuer"
+							type="url"
+							placeholder="https://id.example.com"
+							:disabled="formDisabled"
+							required
+						/>
+					</UiField>
+					<UiField :label="t('clientId')" v-slot="{ id }">
+						<UiInput :id="id" v-model="form.clientId" :disabled="formDisabled" required />
+					</UiField>
+					<UiField :label="t('authMethod')" v-slot="{ id }">
+						<UiSelect
+							v-model="form.authMethod"
+							:id="id"
+							:options="methods"
+							:disabled="formDisabled"
+							block
+						/>
+					</UiField>
+					<UiField v-if="form.authMethod !== 'none'" :label="t('clientSecret')" v-slot="{ id }">
+						<UiInput
+							:id="id"
+							v-model="form.clientSecret"
+							type="password"
+							autocomplete="new-password"
+							:disabled="formDisabled"
+							:placeholder="
+								status?.config?.authMethod !== 'none' &&
+								status?.config?.issuer === form.issuer &&
+								status?.config?.clientId === form.clientId
+									? t('keepSecret')
+									: undefined
+							"
+						/>
+					</UiField>
+				</div>
+			</template>
+		</UiSection>
+		<UiSection appearance="panel" :title="t('signIn')" :icon="Link2">
+			<div class="oidc-fields">
+				<UiField :label="t('subject')" :hint="t('subjectHint')" v-slot="{ id, describedby }">
+					<UiInput
+						:id="id"
+						v-model="form.subject"
+						:aria-describedby="describedby"
+						:disabled="formDisabled"
+						required
+					/>
+				</UiField>
+				<UiField :label="t('origin')" v-slot="{ id }">
+					<UiInput :id="id" v-model="form.origin" type="url" :disabled="formDisabled" required />
+				</UiField>
+			</div>
+			<UiField :label="t('callback')" :hint="t('callbackHint')" v-slot="{ id, describedby }">
+				<UiInput
+					:id="id"
+					:model-value="redirectUri"
+					:aria-describedby="describedby"
+					:disabled="!redirectUri"
+					readonly
+				>
+					<template #trailing>
+						<UiButton
+							appearance="ghost"
+							density="compact"
+							icon-only
+							:aria-label="t('copy')"
+							:disabled="!redirectUri"
+							@click="copyRedirect"
+						>
+							<Copy :size="15" />
+						</UiButton>
+					</template>
+				</UiInput>
+			</UiField>
+		</UiSection>
 		<div class="oidc-actions">
-			<UiButton
-				type="submit"
-				tone="primary"
-				:loading="working && !confirming"
-				:disabled="!status || !redirectUri"
-			>
-				<Save :size="16" />{{ t('save') }}
-			</UiButton>
 			<UiButton
 				v-if="status?.config"
 				type="button"
@@ -183,7 +213,19 @@
 				:disabled="working"
 				@click="confirming = true"
 			>
-				<Trash2 :size="16" />{{ t('remove') }}
+				<template #leading><Trash2 :size="16" /></template>
+				{{ t('remove') }}
+			</UiButton>
+			<UiButton
+				class="oidc-save"
+				type="submit"
+				tone="primary"
+				loading-animation="spinner"
+				:loading="working && !confirming"
+				:disabled="!status || !redirectUri"
+			>
+				<template #leading><Save :size="16" /></template>
+				{{ t('save') }}
 			</UiButton>
 		</div>
 		<UiDialog
@@ -202,17 +244,35 @@
 
 <style scoped>
 	.oidc-app {
+		--ui-section-padding: 18px;
+		container-type: inline-size;
 		display: grid;
-		gap: 16px;
-		max-width: 640px;
-		padding: 22px;
+		gap: var(--ui-layout-gap, 16px);
+		max-width: 820px;
+		margin-inline: auto;
+		padding: clamp(16px, 4vw, 24px);
 	}
-	.oidc-app > :first-child {
-		justify-self: start;
+
+	.oidc-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
+		gap: var(--ui-layout-gap, 16px);
 	}
+
 	.oidc-actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 8px;
+		gap: 12px;
+	}
+
+	.oidc-save {
+		margin-inline-start: auto;
+	}
+
+	@container (max-width: 32rem) {
+		.oidc-fields {
+			grid-template-columns: minmax(0, 1fr);
+		}
 	}
 </style>

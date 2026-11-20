@@ -1,6 +1,6 @@
 {
   "name": "@nexus-terminal/remote-tools",
-  "version": "0.0.1-dev.1",
+  "version": "0.0.1-dev.2",
   "type": "module",
   "description": "Run remote commands, manage archives and read server status",
   "files": [
@@ -34,6 +34,7 @@
   },
   "nexus": {
     "kind": "extension",
+    "icon": "wrench",
     "entry": {
       "backend": "dist/node/index.js"
     },
