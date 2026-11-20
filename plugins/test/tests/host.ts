@@ -218,6 +218,14 @@ export async function startHost(
 		assert.equal(status.state, 'succeeded', JSON.stringify(status));
 	}
 
+	// Authentication is reachable before the built-in Marketplace registers its routes.
+	await until(async () => {
+		const response = await request(market + '/repositories');
+		if (!response.ok && response.status !== 404) assert.fail(market + '/repositories ' + (await response.text()));
+		await response.body?.cancel();
+		return response.ok || undefined;
+	});
+
 	const source = z
 		.object({ id: z.uuid() })
 		.parse(await json(market + '/repositories', { url: remote + '/catalog.json' }, 'POST', 201));
