@@ -943,6 +943,51 @@
             "integrity": "sha512-1hf2t5vr+StCW7HkMaMYXIFMWgVL4x6jwCspBCLckS6/ULhU7FuIMmgn6fY09ExUKQEueJMEPvddUuhZsH64zA=="
           }
         ]
+      },
+      {
+        "package": {
+          "name": "@nexus-terminal/passkey",
+          "version": "0.0.1-dev.3",
+          "type": "module",
+          "description": "Sign in with WebAuthn passkeys",
+          "displayName": "Passkeys",
+          "files": [
+            "dist"
+          ],
+          "peerDependencies": {
+            "nexus-terminal": "^1.1.0"
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "nexus": {
+            "kind": "application",
+            "icon": "fingerprint",
+            "entry": {
+              "backend": "dist/node/index.js",
+              "frontend": "dist/browser/index.js"
+            },
+            "authMethods": true,
+            "i18n": {
+              "zh-CN": {
+                "description": "管理通行密钥并用于登录",
+                "displayName": "通行密钥"
+              }
+            }
+          },
+          "scripts": {
+            "build": "node ../../scripts/build-plugin.mjs",
+            "test:setup": "playwright install --with-deps chromium",
+            "typecheck": "vue-tsc --noEmit",
+            "test": "pnpm build && vitest run"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/passkey/v0.0.1-dev.3/passkey-0.0.1-dev.3.tgz",
+            "integrity": "sha512-CB+H0a7oUt/far+Dy9V7NN92foUrNlQVJo+dDL1oIT6mX9i7xx6QoQnsobizFuN+/Udvfv1fDpBn7FeWJGeC3A=="
+          }
+        ]
       }
     ]
   },
