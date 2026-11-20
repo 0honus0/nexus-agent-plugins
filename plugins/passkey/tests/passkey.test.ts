@@ -46,6 +46,9 @@ it.each([
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 		await page.getByRole('button', { name: 'Passkeys', exact: true }).click();
 		const manager = page.getByRole('region', { name: 'Passkeys', exact: true });
+		const emptyState = manager.locator('[data-ui="empty-state"]');
+		const list = manager.getByRole('list');
+		const addButton = { name: 'Add passkey', exact: true };
 		await expect(manager.getByText('No passkeys registered')).toBeVisible();
 		await expect(manager.getByRole('textbox')).toHaveCount(0);
 		if (aaguid) {
@@ -67,8 +70,13 @@ it.each([
 				{ times: 1 },
 			);
 		}
-		await manager.getByRole('button', { name: 'Add passkey', exact: true }).click();
+		await expect(list).toHaveCount(0);
+		await emptyState.getByRole('button', addButton).click();
 		await expect(manager.getByText(label, { exact: true })).toBeVisible();
+		const addAnother = list.getByRole('listitem').last().getByRole('button', addButton);
+		await expect(addAnother).toBeEnabled();
+		await expect(addAnother).toHaveAttribute('data-appearance', 'ghost');
+		await expect(emptyState).toHaveCount(0);
 
 		const { items } = PasskeyListSchema.parse(await host.json(path + '/passkeys'));
 		expect(items).toEqual([expect.objectContaining({ name, origin: origin.origin })]);
@@ -92,6 +100,7 @@ it.each([
 			.getByRole('button', { name: 'Remove', exact: true })
 			.click();
 		await expect(manager.getByText('No passkeys registered')).toBeVisible();
+		await expect(emptyState.getByRole('button', addButton)).toBeEnabled();
 		expect((await page.request.post(origin.origin + '/api/auth/logout', { data: {} })).ok()).toBe(true);
 		await page.goto(origin.href);
 		await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();

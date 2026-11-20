@@ -69,17 +69,27 @@
 </script>
 
 <template>
-	<section class="passkey-app">
-		<UiButton
-			class="passkey-add"
-			tone="primary"
-			:loading="adding"
-			:disabled="!items || !supported || removing"
-			@click="add"
+	<section class="passkey-app" :class="{ 'passkey-app--empty': items?.length === 0 }">
+		<UiEmptyState
+			v-if="items?.length === 0"
+			:icon="Fingerprint"
+			:title="t('empty')"
+			:description="supported ? undefined : t('secureOrigin')"
 		>
-			<Plus :size="16" />{{ t('add') }}
-		</UiButton>
-		<p v-if="!supported" class="passkey-hint">{{ t('secureOrigin') }}</p>
+			<template v-if="supported" #default>
+				<UiButton
+					tone="primary"
+					:loading="adding"
+					:disabled="removing"
+					loading-animation="spinner"
+					@click="add"
+				>
+					<template #leading><Plus :size="16" /></template>
+					{{ t('add') }}
+				</UiButton>
+			</template>
+		</UiEmptyState>
+		<p v-if="!supported && items?.length !== 0" class="passkey-hint">{{ t('secureOrigin') }}</p>
 		<UiList v-if="items?.length">
 			<UiListItem
 				v-for="item in items"
@@ -101,8 +111,21 @@
 					</UiButton>
 				</template>
 			</UiListItem>
+			<li v-if="supported" class="passkey-add-row">
+				<UiButton
+					appearance="ghost"
+					tone="primary"
+					block
+					:loading="adding"
+					:disabled="removing"
+					loading-animation="spinner"
+					@click="add"
+				>
+					<template #leading><Plus :size="16" /></template>
+					{{ t('add') }}
+				</UiButton>
+			</li>
 		</UiList>
-		<UiEmptyState v-else-if="items" :icon="Fingerprint" :title="t('empty')" />
 		<UiDialog
 			:open="!!selected"
 			:title="t('removeTitle')"
@@ -121,11 +144,16 @@
 <style scoped>
 	.passkey-app {
 		display: grid;
-		gap: 18px;
-		padding: 22px;
+		gap: var(--ui-layout-gap, 16px);
+		padding: clamp(16px, 4vw, 22px);
 	}
-	.passkey-add {
-		justify-self: start;
+	.passkey-app--empty {
+		min-block-size: 100%;
+		align-content: center;
+	}
+	.passkey-add-row {
+		padding: 5px 8px;
+		border-top: 1px solid var(--ui-list-border, var(--ui-border));
 	}
 	.passkey-hint {
 		margin: 0;

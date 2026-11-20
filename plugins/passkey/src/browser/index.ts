@@ -18,6 +18,7 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 				label: (locale) => (locale?.startsWith('zh') ? messages.zh.title : messages.en.title),
 
 				component: defineAsyncComponent(() => import('./PasskeyApp.vue')),
+				scrollMode: 'window',
 			},
 		],
 		login: [
