@@ -31,9 +31,23 @@ it('configures the provider, accepts only a valid signature for the configured s
 	await page.getByLabel('Username', { exact: true }).fill('owner');
 	await page.getByLabel('Password', { exact: true }).fill('sdk-fixture-password');
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-	await page.getByRole('button', { name: 'OpenID Connect', exact: true }).click();
 
 	const app = page.getByRole('region', { name: 'OpenID Connect', exact: true });
+	const initialConfig = Promise.withResolvers<void>();
+	await page.route(
+		host.origin + path + '/configuration',
+		async (route) => {
+			await initialConfig.promise;
+			await route.continue();
+		},
+		{ times: 1 },
+	);
+	try {
+		await page.getByRole('button', { name: 'OpenID Connect', exact: true }).click();
+		await expect(app.getByLabel('Issuer URL', { exact: true })).toBeDisabled();
+	} finally {
+		initialConfig.resolve();
+	}
 	await app.getByLabel('Issuer URL', { exact: true }).fill(provider.issuer);
 	await app.getByLabel('Client ID', { exact: true }).fill(provider.clientId);
 	await app.getByLabel('Client secret', { exact: true }).fill(provider.secret);

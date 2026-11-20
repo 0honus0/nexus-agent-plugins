@@ -18,6 +18,7 @@
 	const status = ref<Awaited<ReturnType<typeof loadStatus>>>();
 	const form = ref<OidcConfigInput>(blankForm());
 	const working = ref(false);
+	const formDisabled = computed(() => !status.value || working.value);
 	const confirming = ref(false);
 	const methods = computed(() => [
 		{ value: 'client_secret_basic', label: 'client_secret_basic' },
@@ -51,7 +52,9 @@
 
 	onMounted(async () => {
 		try {
-			apply(await loadStatus(view.signal));
+			const initial = await loadStatus(view.signal);
+			view.signal.throwIfAborted();
+			apply(initial);
 		} catch (cause) {
 			reportOidcFailure(context, cause, view.signal);
 		}
@@ -122,15 +125,15 @@
 				v-model="form.issuer"
 				type="url"
 				placeholder="https://id.example.com"
-				:disabled="working"
+				:disabled="formDisabled"
 				required
 			/>
 		</UiField>
 		<UiField :label="t('clientId')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.clientId" :disabled="working" required />
+			<UiInput :id="id" v-model="form.clientId" :disabled="formDisabled" required />
 		</UiField>
 		<UiField :label="t('authMethod')" v-slot="{ id }">
-			<UiSelect v-model="form.authMethod" :id="id" :options="methods" :disabled="working" block />
+			<UiSelect v-model="form.authMethod" :id="id" :options="methods" :disabled="formDisabled" block />
 		</UiField>
 		<UiField v-if="form.authMethod !== 'none'" :label="t('clientSecret')" v-slot="{ id }">
 			<UiInput
@@ -138,7 +141,7 @@
 				v-model="form.clientSecret"
 				type="password"
 				autocomplete="new-password"
-				:disabled="working"
+				:disabled="formDisabled"
 				:placeholder="
 					status?.config?.authMethod !== 'none' &&
 					status?.config?.issuer === form.issuer &&
@@ -149,10 +152,10 @@
 			/>
 		</UiField>
 		<UiField :label="t('subject')" :hint="t('subjectHint')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.subject" :disabled="working" required />
+			<UiInput :id="id" v-model="form.subject" :disabled="formDisabled" required />
 		</UiField>
 		<UiField :label="t('origin')" v-slot="{ id }">
-			<UiInput :id="id" v-model="form.origin" type="url" :disabled="working" required />
+			<UiInput :id="id" v-model="form.origin" type="url" :disabled="formDisabled" required />
 		</UiField>
 		<UiField v-if="redirectUri" :label="t('callback')" :hint="t('callbackHint')" v-slot="{ id }">
 			<UiInput :id="id" :model-value="redirectUri" readonly>

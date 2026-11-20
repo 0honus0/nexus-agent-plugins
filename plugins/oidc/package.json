@@ -1,6 +1,6 @@
 {
   "name": "@nexus-terminal/oidc",
-  "version": "0.0.1-dev.1",
+  "version": "0.0.1-dev.2",
   "type": "module",
   "description": "Sign in with an OpenID Connect provider",
   "displayName": "OpenID Connect",
