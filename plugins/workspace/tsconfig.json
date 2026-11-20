@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "ES2024.Promise", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@nexus-terminal/ssh/ssh-api": ["../ssh/src/node/ssh-api.ts"],
+      "@nexus-terminal/credentials/credentials-api": ["../credentials/src/node/credentials-api.ts"],
+      "@nexus-terminal/connections/connections-api": ["../connections/src/node/connections-api.ts"],
+      "@nexus-terminal/connections/connections-client-api": ["../connections/src/browser/connections-client-api.ts"],
+      "@nexus-terminal/remote-tools/remote-tools-api": ["../remote-tools/src/node/remote-tools-api.ts"],
+      "@nexus-terminal/remote-tools/remote-tools-types": ["../remote-tools/src/shared/remote-tools-types.ts"],
+      "@nexus-terminal/remote-tools/remote-file-types": ["../remote-tools/src/shared/remote-file-types.ts"],
+      "@nexus-terminal/remote-tools/remote-transfer-types": ["../remote-tools/src/shared/remote-transfer-types.ts"],
+      "@nexus-terminal/credentials/credentials-client-api": ["../credentials/src/browser/credentials-client-api.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "scripts/**/*.ts"]
+}

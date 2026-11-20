@@ -1,4 +1,4 @@
-import { defineAsyncComponent, defineComponent, h, ref } from 'vue';
+import { defineAsyncComponent, defineComponent, h } from 'vue';
 import type { PluginModuleApi, PluginWindowProps } from 'nexus-terminal/browser';
 import { CredentialsClient } from './credentials-client-api.js';
 import { messages } from './messages.js';
@@ -7,7 +7,7 @@ import './credentials.css';
 export const activate: PluginModuleApi['activate'] = (context) => {
 	context.app.log.registerMessages({ en: messages.en.notices, zh: messages.zh.notices });
 	const client = new CredentialsClient(context);
-	const label = ref('Credentials');
+	const titles = new Map(Object.entries(messages).map(([language, { title }]) => [language, title]));
 
 	const style = document.createElement('link');
 	style.rel = 'stylesheet';
@@ -22,11 +22,23 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 			props: ['context', 'view'],
 
 			setup(props: PluginWindowProps) {
-				return () => h(App, { ...props, runtime: client, label });
+				return () => h(App, { ...props, runtime: client });
 			},
 		});
 	});
 	context.provide('credentials', client);
-	context.contribute({ applications: [{ id: 'main', label, component, scrollbarGutter: 'stable' }] });
+	context.contribute({
+		applications: [
+			{
+				id: 'main',
+
+				label: (locale?: string) =>
+					(locale === undefined ? undefined : titles.get(locale)) ?? messages.en.title,
+
+				component,
+				scrollbarGutter: 'stable',
+			},
+		],
+	});
 	context.self.readiness.set({ state: 'ready' });
 };

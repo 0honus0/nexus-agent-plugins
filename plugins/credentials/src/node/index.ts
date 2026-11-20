@@ -3,7 +3,7 @@ import { CredentialsRevisionSchema } from '../shared/credentials-types.js';
 import { Credentials } from './credentials-api.js';
 import { registerCredentialsHttp } from './credentials-http.js';
 
-export { backup, migrations } from './credentials-sql.js';
+export { backup, migrations } from './credentials-storage.js';
 
 export const activate: PluginModuleApi['activate'] = (context) => {
 	context.use({ ssh: ['@nexus-terminal/ssh', 'ssh'] }, (scope) => {

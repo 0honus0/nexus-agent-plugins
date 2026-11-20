@@ -1,0 +1,52 @@
+{
+  "name": "@nexus-terminal/remote-tools",
+  "version": "0.0.1-dev.1",
+  "type": "module",
+  "description": "Run remote commands, manage archives and read server status",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./remote-tools-api": {
+      "types": "./dist/types/node/remote-tools-api.d.ts"
+    },
+    "./remote-file-types": {
+      "types": "./dist/types/shared/remote-file-types.d.ts",
+      "import": "./dist/node/remote-file-types.js"
+    },
+    "./remote-tools-types": {
+      "types": "./dist/types/shared/remote-tools-types.d.ts",
+      "import": "./dist/node/remote-tools-types.js"
+    },
+    "./remote-transfer-types": {
+      "types": "./dist/types/shared/remote-transfer-types.d.ts",
+      "import": "./dist/node/remote-transfer-types.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "pnpm build && vitest run"
+  },
+  "peerDependencies": {
+    "nexus-terminal": "^1.1.0"
+  },
+  "nexus": {
+    "kind": "extension",
+    "entry": {
+      "backend": "dist/node/index.js"
+    },
+    "dependsOn": {
+      "@nexus-terminal/ssh": "^0.0.1-dev.1"
+    },
+    "i18n": {
+      "zh-CN": {
+        "description": "执行远程命令、压缩解压文件、读取服务器状态"
+      }
+    }
+  },
+  "engines": {
+    "node": ">=26.13.1"
+  }
+}

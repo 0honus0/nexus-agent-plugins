@@ -1,8 +1,9 @@
 {
   "name": "@nexus-terminal/connections",
-  "version": "0.0.1-dev.1",
+  "version": "0.0.1-dev.2",
   "type": "module",
   "description": "Manage SSH, RDP and VNC connections",
+  "displayName": "Connections",
   "files": [
     "dist"
   ],
@@ -33,11 +34,12 @@
       "frontend": "dist/browser/index.js"
     },
     "dependsOn": {
-      "@nexus-terminal/credentials": "^0.0.1-dev.1"
+      "@nexus-terminal/credentials": "^0.0.1-dev.2"
     },
     "i18n": {
       "zh-CN": {
-        "description": "管理 SSH、RDP 和 VNC 连接"
+        "description": "管理 SSH、RDP 和 VNC 连接",
+        "displayName": "连接管理"
       }
     }
   }

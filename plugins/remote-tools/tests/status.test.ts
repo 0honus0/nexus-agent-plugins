@@ -1,0 +1,21 @@
+import { it, expect } from 'vitest';
+import { LinuxStatusParser } from '../src/node/linux-status-parser';
+import { statusSample } from './status-sample';
+it('preserves byte units and computes CPU/network deltas only after a baseline', () => {
+	const parser = new LinuxStatusParser();
+	const first = parser.parse(statusSample(0), 1000);
+	expect(first.cpuPercent).toBeUndefined();
+	expect(first.netRxRate).toBeUndefined();
+	expect(first.memTotal).toBe(8 * 1024 ** 3);
+	expect(first.memPercent).toBe(25);
+	expect(first.diskPercent).toBe(40);
+	const next = parser.parse(statusSample(1), 4000);
+	expect(next.cpuPercent).toBe(40);
+	expect(next.netRxRate).toBe(2000);
+	expect(next.netTxRate).toBe(1000);
+	expect(parser.parse(statusSample(2, 'ens3'), 7000).netRxRate).toBeUndefined();
+	expect(parser.parse(statusSample(0, 'ens3'), 10000).netRxRate).toBeUndefined();
+	parser.clear();
+	expect(parser.parse(statusSample(3), 13000).cpuPercent).toBeUndefined();
+	expect(() => parser.parse('untrusted remote output')).toThrow('REMOTE_TOOLS_STATUS_UNAVAILABLE');
+});

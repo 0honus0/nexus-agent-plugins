@@ -3,7 +3,7 @@ import { ConnectionsRevisionSchema } from '../shared/connection-types.js';
 import { Connections } from './connections-api.js';
 import { registerConnectionsHttp } from './connections-http.js';
 
-export { backup, migrations } from './connections-sql.js';
+export { backup, migrations } from './connections-storage.js';
 
 export const activate: PluginModuleApi['activate'] = (context) => {
 	context.use({ credentials: ['@nexus-terminal/credentials', 'credentials'] }, (scope) => {

@@ -23,6 +23,7 @@ export type {
 
 export interface ConnectionsClientApi {
 	readonly catalog: Readonly<Ref<ConnectionCatalog>>;
+	readonly loaded: Readonly<Ref<boolean>>;
 	refresh(signal?: AbortSignal): Promise<void>;
 	openManager(): void;
 	openEditor(request: ConnectionEditorRequest, signal?: AbortSignal): Promise<void>;

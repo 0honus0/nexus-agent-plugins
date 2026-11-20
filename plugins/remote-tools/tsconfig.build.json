@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist/types",
+    "paths": {
+      "@nexus-terminal/ssh/ssh-api": ["../ssh/dist/node/ssh-api.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests"]
+}

@@ -148,6 +148,7 @@
 				/>
 			</div>
 			<div class="connections-toolbar-actions">
+				<UiButton tone="primary" @click="editor = {}"><Plus :size="17" />{{ t('add') }}</UiButton>
 				<UiButton
 					appearance="ghost"
 					icon-only
@@ -155,8 +156,8 @@
 					loading-animation="icon"
 					:aria-label="t('refresh')"
 					@click="refresh"
-					><RefreshCw :size="17" /></UiButton
-				><UiButton tone="primary" @click="editor = {}"><Plus :size="17" />{{ t('add') }}</UiButton>
+					><RefreshCw :size="17"
+				/></UiButton>
 			</div>
 		</header>
 		<div class="connections-list" :aria-busy="loading">

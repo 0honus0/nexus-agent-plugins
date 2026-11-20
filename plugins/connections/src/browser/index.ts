@@ -3,6 +3,7 @@ import type { PluginApplicationTileProps, PluginModuleApi, PluginWindowProps } f
 import { ConnectionsClient } from './connections-client-api.js';
 import { connectionsKey } from './connections-view.js';
 import { messages } from './messages.js';
+import ConnectionsTile from './ConnectionsTile.vue';
 import './connections.css';
 
 export const activate: PluginModuleApi['activate'] = (context) => {
@@ -30,16 +31,13 @@ export const activate: PluginModuleApi['activate'] = (context) => {
 		});
 	});
 
-	const tile = defineAsyncComponent(async () => {
-		const { default: Tile } = await import('./ConnectionsTile.vue');
-		context.signal.throwIfAborted();
-		return defineComponent({
-			props: ['context', 'view', 'size', 'open'],
+	// 首屏卡片随贡献一起就绪，窗口组件继续在打开时加载。
+	const tile = defineComponent({
+		props: ['context', 'view', 'size', 'open'],
 
-			setup(props: PluginApplicationTileProps) {
-				return () => h(Tile, { ...props, runtime: client, label });
-			},
-		});
+		setup(props: PluginApplicationTileProps) {
+			return () => h(ConnectionsTile, { ...props, runtime: client, label });
+		},
 	});
 
 	context.provide('connections', client);

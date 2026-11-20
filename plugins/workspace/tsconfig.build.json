@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist/types",
+    "paths": {
+      "@nexus-terminal/ssh/ssh-api": ["../ssh/dist/node/ssh-api.d.ts"],
+      "@nexus-terminal/credentials/credentials-api": ["../credentials/dist/types/node/credentials-api.d.ts"],
+      "@nexus-terminal/connections/connections-api": ["../connections/dist/types/node/connections-api.d.ts"],
+      "@nexus-terminal/connections/connections-client-api": [
+        "../connections/dist/types/browser/connections-client-api.d.ts"
+      ],
+      "@nexus-terminal/remote-tools/remote-tools-api": ["../remote-tools/dist/types/node/remote-tools-api.d.ts"],
+      "@nexus-terminal/remote-tools/remote-tools-types": ["../remote-tools/dist/types/shared/remote-tools-types.d.ts"],
+      "@nexus-terminal/remote-tools/remote-file-types": ["../remote-tools/dist/types/shared/remote-file-types.d.ts"],
+      "@nexus-terminal/remote-tools/remote-transfer-types": [
+        "../remote-tools/dist/types/shared/remote-transfer-types.d.ts"
+      ],
+      "@nexus-terminal/credentials/credentials-client-api": [
+        "../credentials/dist/types/browser/credentials-client-api.d.ts"
+      ]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue"]
+}

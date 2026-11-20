@@ -130,6 +130,19 @@ test(
 		assert.equal((await host.request(credentials + '/' + linked, { method: 'DELETE' })).status, 204);
 		await expect(app.getByText('SSH fixture')).toHaveCount(0);
 
+		await app.getByRole('button', { name: 'Close application' }).click();
+		await page.getByRole('button', { name: 'Settings', exact: true }).click();
+		await page.getByRole('combobox', { name: 'Language' }).click();
+		await page.getByRole('option', { name: '简体中文' }).click();
+		await page.getByRole('region', { name: '设置', exact: true }).getByRole('button', { name: '关闭应用' }).click();
+		await tile.getByRole('button', { name: '连接管理', exact: true }).click();
+		const localizedApp = page.getByRole('region', { name: '连接管理', exact: true }).first();
+		await localizedApp.getByRole('button', { name: '添加连接', exact: true }).click();
+		await page.getByRole('dialog', { name: '添加连接' }).getByRole('button', { name: '关闭', exact: true }).click();
+		await localizedApp.getByRole('button', { name: '关闭应用' }).click();
+		await expect(localizedApp).toHaveCount(0);
+		await expect(tile.getByRole('button', { name: '连接管理', exact: true })).toBeVisible();
+
 		const preview = z
 			.object({
 				token: z.uuid(),

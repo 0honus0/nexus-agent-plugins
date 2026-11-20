@@ -1,5 +1,5 @@
 <script setup lang="ts">
-	import { ref, computed, onMounted, watchEffect, type Ref } from 'vue';
+	import { ref, computed, onMounted } from 'vue';
 	import { KeyRound, LockKeyhole, Plus, Search, Trash2, RefreshCw } from '@lucide/vue';
 	import { UiInput, UiButton, UiSelect, UiCard, UiBadge, UiEmptyState, UiDialog } from 'nexus-terminal/browser/ui';
 	import type { PluginWindowProps } from 'nexus-terminal/browser';
@@ -8,9 +8,8 @@
 	import type { CredentialsClient } from './credentials-client-api.js';
 	import type { Credential } from '../shared/credentials-types';
 	import CredentialEditor from './CredentialEditor.vue';
-	const props = defineProps<PluginWindowProps & { runtime: CredentialsClient; label: Ref<string> }>();
+	const props = defineProps<PluginWindowProps & { runtime: CredentialsClient }>();
 	const { t } = useI18n({ useScope: 'local', messages });
-	watchEffect(() => (props.label.value = t('title')));
 	const { items, loaded, pending: requests } = props.runtime;
 	const loading = computed(() => requests.value > 0);
 
@@ -62,6 +61,7 @@
 				<UiSelect v-model="type" :options="types" :aria-label="t('type')" block />
 			</div>
 			<div class="credentials-toolbar-actions">
+				<UiButton tone="primary" @click="editor = {}"><Plus :size="17" />{{ t('add') }}</UiButton>
 				<UiButton
 					appearance="ghost"
 					icon-only
@@ -71,7 +71,6 @@
 					@click="refresh"
 					><RefreshCw :size="17"
 				/></UiButton>
-				<UiButton tone="primary" @click="editor = {}"><Plus :size="17" />{{ t('add') }}</UiButton>
 			</div>
 		</header>
 		<div class="credentials-list" :aria-busy="loading">

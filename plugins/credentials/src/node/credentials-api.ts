@@ -1,4 +1,4 @@
-import { createPrivateKey, randomUUID } from 'node:crypto';
+import { createPrivateKey } from 'node:crypto';
 import type { SshApi } from '@nexus-terminal/ssh/ssh-api';
 import type { PluginAppApi } from 'nexus-terminal/node';
 import {
@@ -10,7 +10,7 @@ import {
 	type CredentialPatch,
 	type CredentialsSnapshot,
 } from '../shared/credentials-types.js';
-import { materialContext, references, table, type CredentialRow, type CredentialTables } from './credentials-sql.js';
+import { CredentialsStorage, materialContext, type StoredCredential } from './credentials-storage.js';
 
 export type CredentialErrorCode =
 	| 'CREDENTIALS_INVALID_REQUEST'
@@ -66,27 +66,14 @@ declare module 'nexus-terminal/node' {
 	}
 }
 
-const metadata = ['id', 'name', 'username', 'type', 'has_passphrase', 'created_at', 'updated_at'] as const;
 const cryptoOptions = { mode: 'local', context: materialContext } as const;
-
-function summary(row: Pick<CredentialRow, (typeof metadata)[number]>): Credential {
-	const { id, name, username, type, has_passphrase, created_at, updated_at } = row;
-	return {
-		id,
-		name,
-		username,
-		type,
-		hasPassphrase: Boolean(has_passphrase),
-		createdAt: created_at,
-		updatedAt: updated_at,
-	};
-}
 
 export class Credentials implements CredentialsApi {
 	#revision = 0;
 	#pending: Promise<unknown> = Promise.resolve();
 
-	readonly #app: Pick<PluginAppApi, 'database' | 'crypto'>;
+	readonly #storage: CredentialsStorage;
+	readonly #crypto: PluginAppApi['crypto'];
 	readonly #ssh: Pick<SshApi, 'parsePrivateKey'>;
 	readonly #signal: AbortSignal;
 	readonly #publish: (revision: number) => void;
@@ -97,7 +84,8 @@ export class Credentials implements CredentialsApi {
 		signal: AbortSignal,
 		publish: (revision: number) => void,
 	) {
-		this.#app = app;
+		this.#storage = new CredentialsStorage(app.database);
+		this.#crypto = app.crypto;
 		this.#ssh = ssh;
 		this.#signal = signal;
 		this.#publish = publish;
@@ -105,31 +93,16 @@ export class Credentials implements CredentialsApi {
 
 	async list(): Promise<CredentialsSnapshot> {
 		this.#signal.throwIfAborted();
-		const rows = await this.#app.database.withClient((db) =>
-			db
-				.$extendTables<CredentialTables>()
-				.selectFrom(table)
-				.select(metadata)
-				.orderBy('name')
-				.orderBy('id')
-				.execute(),
-		);
+		const items = await this.#storage.list();
 		this.#signal.throwIfAborted();
-		return { revision: this.#revision, items: rows.map(summary) };
+		return { revision: this.#revision, items };
 	}
 
 	async get(id: string): Promise<Credential | undefined> {
 		this.#signal.throwIfAborted();
-		const row = await this.#app.database.withClient((db) =>
-			db
-				.$extendTables<CredentialTables>()
-				.selectFrom(table)
-				.select(metadata)
-				.where('id', '=', id)
-				.executeTakeFirst(),
-		);
+		const value = await this.#storage.get(id);
 		this.#signal.throwIfAborted();
-		return row && summary(row);
+		return value;
 	}
 
 	async resolve(id: string): Promise<CredentialMaterial> {
@@ -143,14 +116,10 @@ export class Credentials implements CredentialsApi {
 			const parsed = CredentialInputSchema.safeParse(input);
 			if (!parsed.success) throw new CredentialError('CREDENTIALS_INVALID_REQUEST');
 			const value = await this.#encode(parsed.data);
-			const now = Date.now();
 			this.#assertActive(signal);
-			const row = { ...value, id: randomUUID(), created_at: now, updated_at: now };
-			await this.#app.database.withClient((db) =>
-				db.$extendTables<CredentialTables>().insertInto(table).values(row).execute(),
-			);
+			const created = await this.#storage.create(value);
 			this.#changed();
-			return summary(row);
+			return created;
 		});
 	}
 
@@ -165,38 +134,18 @@ export class Credentials implements CredentialsApi {
 			if (!parsed.success) throw new CredentialError('CREDENTIALS_INVALID_REQUEST');
 			const value = await this.#encode(parsed.data);
 			this.#assertActive(signal);
-			const updated = await this.#app.database.withClient((db) =>
-				db
-					.$extendTables<CredentialTables>()
-					.updateTable(table)
-					.set({ ...value, updated_at: Date.now() })
-					.where('id', '=', id)
-					.returning(metadata)
-					.executeTakeFirstOrThrow(),
-			);
+			const updated = await this.#storage.update(id, value);
 			this.#changed();
-			return summary(updated);
+			return updated;
 		});
 	}
 
 	remove(id: string, signal?: AbortSignal): Promise<void> {
 		return this.#write(signal, async () => {
-			await this.#app.database.withClient((db) =>
-				db
-					.$extendTables<CredentialTables>()
-					.transaction()
-					.execute(async (transaction) => {
-						const link = await transaction
-							.selectFrom(references)
-							.select('key')
-							.where('credential_id', '=', id)
-							.executeTakeFirst();
-						if (link) throw new CredentialError('CREDENTIALS_IN_USE');
-						this.#assertActive(signal);
-						const deleted = await transaction.deleteFrom(table).where('id', '=', id).executeTakeFirst();
-						if (!deleted.numDeletedRows) throw new CredentialError('CREDENTIALS_NOT_FOUND');
-					}),
-			);
+			const lifetime = signal ? AbortSignal.any([this.#signal, signal]) : this.#signal;
+			const result = await this.#storage.remove(id, lifetime);
+			if (result === 'in-use') throw new CredentialError('CREDENTIALS_IN_USE');
+			if (result === 'missing') throw new CredentialError('CREDENTIALS_NOT_FOUND');
 			this.#changed();
 		});
 	}
@@ -212,16 +161,7 @@ export class Credentials implements CredentialsApi {
 			let inserted = false;
 			if (id) {
 				if (!(await this.get(id))) throw new CredentialError('CREDENTIALS_NOT_FOUND');
-				inserted = await this.#app.database.withClient(async (db) => {
-					const result = await db
-						.$extendTables<CredentialTables>()
-						.insertInto(references)
-						.values({ owner, key, credential_id: id })
-						.onConflict((conflict) => conflict.columns(['owner', 'key', 'credential_id']).doNothing())
-						.returning('key')
-						.executeTakeFirst();
-					return result !== undefined;
-				});
+				inserted = await this.#storage.addReference(owner, key, id);
 			}
 
 			// 提交前保留旧和新引用。跨插件写入中断时，缓存的引用最多过于保守。
@@ -231,26 +171,11 @@ export class Credentials implements CredentialsApi {
 				result = await save();
 			} catch (cause) {
 				if (id && inserted && !this.#signal.aborted && !signal?.aborted)
-					await this.#app.database.withClient((db) =>
-						db
-							.$extendTables<CredentialTables>()
-							.deleteFrom(references)
-							.where('owner', '=', owner)
-							.where('key', '=', key)
-							.where('credential_id', '=', id)
-							.execute(),
-					);
+					await this.#storage.removeReference(owner, key, id);
 				throw cause;
 			}
 
-			await this.#app.database.withClient((db) => {
-				const stale = db
-					.$extendTables<CredentialTables>()
-					.deleteFrom(references)
-					.where('owner', '=', owner)
-					.where('key', '=', key);
-				return (id ? stale.where('credential_id', '!=', id) : stale).execute();
-			});
+			await this.#storage.pruneReferences(owner, key, id);
 			return result;
 		});
 	}
@@ -276,17 +201,10 @@ export class Credentials implements CredentialsApi {
 
 	async #material(id: string): Promise<CredentialInput> {
 		this.#signal.throwIfAborted();
-		const row = await this.#app.database.withClient((db) =>
-			db
-				.$extendTables<CredentialTables>()
-				.selectFrom(table)
-				.select(['material', 'name', 'username'])
-				.where('id', '=', id)
-				.executeTakeFirst(),
-		);
+		const row = await this.#storage.getMaterial(id);
 		this.#signal.throwIfAborted();
 		if (!row) throw new CredentialError('CREDENTIALS_NOT_FOUND');
-		const clear = await this.#app.crypto.decrypt(row.material, cryptoOptions);
+		const clear = await this.#crypto.decrypt(row.material, cryptoOptions);
 		if (clear.isErr()) throw new CredentialError('CREDENTIALS_OPERATION_FAILED', { cause: clear.error });
 		try {
 			this.#signal.throwIfAborted();
@@ -325,18 +243,18 @@ export class Credentials implements CredentialsApi {
 		}
 	}
 
-	async #encode(input: CredentialInput) {
+	async #encode(input: CredentialInput): Promise<StoredCredential> {
 		this.#keyMaterial(input);
 		const clear = new TextEncoder().encode(JSON.stringify(input));
 		try {
-			const result = await this.#app.crypto.encrypt(clear, cryptoOptions);
+			const result = await this.#crypto.encrypt(clear, cryptoOptions);
 			if (result.isErr()) throw new CredentialError('CREDENTIALS_OPERATION_FAILED', { cause: result.error });
 			return {
 				name: input.name,
 				username: input.username,
 				type: input.type,
 				material: result.value,
-				has_passphrase: Number(input.type === 'privateKey' && Boolean(input.passphrase)),
+				hasPassphrase: input.type === 'privateKey' && Boolean(input.passphrase),
 			};
 		} finally {
 			clear.fill(0);
