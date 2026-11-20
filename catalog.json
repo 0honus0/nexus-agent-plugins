@@ -213,6 +213,60 @@
             "integrity": "sha512-rFXTP5k+bSY61U1S5Fuzjtn4D4PrvUejr+1K8cHWfcP91sVoTsFV5+zZAxrLXk9ZCxm7VuRmjElJ/vgBjNo65Q=="
           }
         ]
+      },
+      {
+        "package": {
+          "name": "@nexus-terminal/connections",
+          "version": "0.0.1-dev.2",
+          "type": "module",
+          "description": "Manage SSH, RDP and VNC connections",
+          "displayName": "Connections",
+          "files": [
+            "dist"
+          ],
+          "exports": {
+            "./connections-api": {
+              "types": "./dist/types/node/connections-api.d.ts"
+            },
+            "./connections-client-api": {
+              "types": "./dist/types/browser/connections-client-api.d.ts"
+            }
+          },
+          "peerDependencies": {
+            "nexus-terminal": "^1.1.0"
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "nexus": {
+            "kind": "application",
+            "entry": {
+              "backend": "dist/node/index.js",
+              "frontend": "dist/browser/index.js"
+            },
+            "dependsOn": {
+              "@nexus-terminal/credentials": "^0.0.1-dev.2"
+            },
+            "i18n": {
+              "zh-CN": {
+                "description": "管理 SSH、RDP 和 VNC 连接",
+                "displayName": "连接管理"
+              }
+            }
+          },
+          "scripts": {
+            "build": "node ../../scripts/build-plugin.mjs",
+            "test:setup": "playwright install --with-deps chromium",
+            "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+            "test": "pnpm build && tsx --test tests/*.test.ts"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/connections/v0.0.1-dev.2/connections-0.0.1-dev.2.tgz",
+            "integrity": "sha512-jnvU3VYWhRbuSSU9Q3KNEEt46mWF0JFQ+PlDYiUaZQ6IntMp7V0EW2orTdQjcT2KK+9VYzJH3a/hr79VIKjVhw=="
+          }
+        ]
       }
     ]
   },
