@@ -534,5 +534,54 @@
         ]
       }
     ]
+  },
+  {
+    "id": "@nexus-terminal/oidc",
+    "versions": [
+      {
+        "package": {
+          "name": "@nexus-terminal/oidc",
+          "version": "0.0.1-dev.2",
+          "type": "module",
+          "description": "Sign in with an OpenID Connect provider",
+          "displayName": "OpenID Connect",
+          "files": [
+            "dist"
+          ],
+          "peerDependencies": {
+            "nexus-terminal": "^1.1.0"
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "nexus": {
+            "kind": "application",
+            "entry": {
+              "backend": "dist/node/index.js",
+              "frontend": "dist/browser/index.js"
+            },
+            "authMethods": true,
+            "i18n": {
+              "zh-CN": {
+                "description": "使用 OpenID Connect 身份提供方登录",
+                "displayName": "OpenID Connect"
+              }
+            }
+          },
+          "scripts": {
+            "build": "node ../../scripts/build-plugin.mjs",
+            "test:setup": "playwright install --with-deps chromium",
+            "typecheck": "vue-tsc --noEmit",
+            "test": "pnpm build && vitest run"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/oidc/v0.0.1-dev.2/oidc-0.0.1-dev.2.tgz",
+            "integrity": "sha512-avPj7JyE33mbvQkBpX7pTDH/9HGGHLDeKEZot+mmfh+M54o3lNcCrHmSx8o0PivM3okgVvGM6kz1m1Mg/csh0w=="
+          }
+        ]
+      }
+    ]
   }
 ]
