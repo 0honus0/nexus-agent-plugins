@@ -200,6 +200,60 @@
             "integrity": "sha512-STj8uwRPiNfx9Uee7+VAE0oGCCcyc8VEozqhXeQCY7cJRUuATysg87+nEjf7tic83RqPZ4cavosA1Jv8Ah8B7A=="
           }
         ]
+      },
+      {
+        "package": {
+          "name": "@nexus-terminal/credentials",
+          "version": "0.0.1-dev.3",
+          "type": "module",
+          "description": "Manage usernames, passwords and SSH keys",
+          "displayName": "Credentials",
+          "files": [
+            "dist"
+          ],
+          "exports": {
+            "./credentials-api": {
+              "types": "./dist/types/node/credentials-api.d.ts"
+            },
+            "./credentials-client-api": {
+              "types": "./dist/types/browser/credentials-client-api.d.ts"
+            }
+          },
+          "peerDependencies": {
+            "nexus-terminal": "^1.1.0"
+          },
+          "engines": {
+            "node": ">=26.13.1"
+          },
+          "nexus": {
+            "kind": "application",
+            "entry": {
+              "backend": "dist/node/index.js",
+              "frontend": "dist/browser/index.js"
+            },
+            "dependsOn": {
+              "@nexus-terminal/ssh": "^0.0.1-dev.1"
+            },
+            "i18n": {
+              "zh-CN": {
+                "description": "管理用户名、密码和 SSH 密钥",
+                "displayName": "认证管理"
+              }
+            }
+          },
+          "scripts": {
+            "build": "node ../../scripts/build-plugin.mjs",
+            "test:setup": "playwright install --with-deps chromium",
+            "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+            "test": "pnpm build && tsx --test tests/*.test.ts"
+          }
+        },
+        "distributions": [
+          {
+            "tarball": "https://github.com/0honus0/nexus-plugin/releases/download/credentials/v0.0.1-dev.3/credentials-0.0.1-dev.3.tgz",
+            "integrity": "sha512-PExcu8j30mj6Ai2d5Aec633TrbVVIrdnnb4htvZuST5NZc2baka544PqtftHGRI6gQU2bDyKeDG4BIMBfMys1Q=="
+          }
+        ]
       }
     ]
   },
